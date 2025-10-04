@@ -1,10 +1,5 @@
-import os
 from celery import Celery
-
-
-rabbit = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672//")
-redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
-
+from app.config import settings
 
 celery_app = Celery(
     "tasks",
@@ -12,11 +7,13 @@ celery_app = Celery(
     backend=settings.CELERY_RESULT_BACKEND
 )
 
-celery.autodiscover_tasks(["app.tasks"])
+# Auto-discover tasks in your app
+celery_app.autodiscover_tasks(["app.tasks"])
 
-celery.conf.beat_schedule = {
-    'fetch-prices-every-minute': {
-        'task': 'app.tasks.fetch_and_store_prices',
-        'schedule': 60.0,
+# Optional: periodic tasks
+celery_app.conf.beat_schedule = {
+    "fetch-prices-every-minute": {
+        "task": "app.tasks.fetch_and_store_prices",
+        "schedule": 60.0,
     },
 }

@@ -1,7 +1,8 @@
-# app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, watchlist, prices  # import your routers
+from app.routes.auth import router as auth_router
+from app.routes.watchlist import router as watchlist_router
+from app.routes.prices import router as prices_router
 
 app = FastAPI(title="CryptoTracker API")
 
@@ -15,6 +16,6 @@ app.add_middleware(
 )
 
 # --- Include your API routers ---
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(watchlist.router, prefix="/watchlist", tags=["watchlist"])
-app.include_router(prices.router, prefix="/prices", tags=["prices"])
+app.include_router(auth_router)
+app.include_router(watchlist_router)
+app.include_router(prices_router)
