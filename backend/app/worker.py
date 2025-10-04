@@ -6,7 +6,7 @@ import random
 import datetime
 
 celery_app = Celery(
-    "worker",
+    "tasks",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
 )
