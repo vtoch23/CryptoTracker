@@ -1,13 +1,12 @@
-# build
+# Stage 1: build Angular app
 FROM node:18-alpine as build
 WORKDIR /app
-COPY frontend/package*.json ./
+COPY package*.json ./
 RUN npm ci
-COPY frontend/ .
+COPY . .
 RUN npm run build -- --output-path=dist
 
-
-# serve with nginx
+# Stage 2: serve with nginx
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80

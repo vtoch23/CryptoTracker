@@ -1,4 +1,3 @@
-import os
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
@@ -6,9 +5,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = os.getenv("DATABASE_URL")
-    REDIS_URL: str = os.getenv("REDIS_URL")
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "supersecretkey")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440))
+    DATABASE_URL: str
+    REDIS_URL: str
+    SECRET_KEY: str = "supersecretkey"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+
+    class Config:
+        env_file = ".env"  # Optional: Pydantic will automatically load from .env
+        env_file_encoding = "utf-8"
 
 settings = Settings()
