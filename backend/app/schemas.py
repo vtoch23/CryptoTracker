@@ -12,7 +12,7 @@ class UserOut(BaseModel):
     is_active: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class WatchlistItemCreate(BaseModel):
     symbol: str
@@ -25,7 +25,7 @@ class WatchlistItemOut(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class PricePointOut(BaseModel):
     symbol: str
@@ -33,7 +33,7 @@ class PricePointOut(BaseModel):
     timestamp: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Token(BaseModel):
     access_token: str

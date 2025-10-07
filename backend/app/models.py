@@ -7,14 +7,14 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
 
 class WatchlistItem(Base):
     __tablename__ = "watchlist"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"))
     symbol = Column(String, index=True)
     target_price = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

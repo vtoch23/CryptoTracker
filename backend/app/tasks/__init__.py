@@ -1,0 +1,1 @@
+from .fetch_and_store_prices import fetch_and_store_prices
