@@ -12,7 +12,7 @@ app.autodiscover_tasks(["app.tasks.fetch_and_store_prices", "app.tasks.check_pri
 print("Celery app initialized")
 
 app.conf.beat_schedule = {
-    "fetch-prices-every-5-minutes": {
+    "fetch-prices-every-10-minutes": {
         "task": "app.tasks.fetch_and_store_prices",
         "schedule": 600.0,  # Every 10 minutes
     },
