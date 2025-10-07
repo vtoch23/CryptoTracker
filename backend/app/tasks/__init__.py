@@ -1,1 +1,2 @@
 from .fetch_and_store_prices import fetch_and_store_prices
+import app.tasks.check_price_alerts
