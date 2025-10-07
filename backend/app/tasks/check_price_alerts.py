@@ -68,7 +68,7 @@ def check_price_alerts():
             target_price = item.target_price
             
             # Check if target price is met
-            if current_price >= target_price:
+            if current_price == target_price:
                 user = db.query(User).filter(User.id == item.user_id).first()
                 
                 if user and user.is_active:
@@ -84,18 +84,18 @@ def check_price_alerts():
                         alerts_sent += 1
                         logger.info(f"📧 Alert sent to {user.email} for {symbol_upper}: ${current_price:.2f} >= ${target_price:.2f}")
                         
-                        # Remove from watchlist after alert (or you can keep it)
-                        db.delete(item)
+                        # Remove from watchlist after alert
+                        # db.delete(item)
                         
                     except Exception as e:
                         logger.error(f"Failed to send alert to {user.email}: {e}")
 
         db.commit()
-        logger.info(f"✅ Checked {alerts_checked} watchlist items, sent {alerts_sent} alerts")
+        logger.info(f"Checked {alerts_checked} watchlist items, sent {alerts_sent} alerts")
         return {"status": "success", "checked": alerts_checked, "alerts_sent": alerts_sent}
 
     except Exception as e:
-        logger.error(f"❌ Error checking price alerts: {e}")
+        logger.error(f"Error checking price alerts: {e}")
         db.rollback()
         return {"status": "error", "message": str(e)}
     finally:
@@ -106,7 +106,7 @@ def send_price_alert_email(user_email: str, symbol: str, current_price: float, t
     """Send email notification when price target is reached."""
     try:
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = f'🚨 {symbol} Price Alert: ${current_price:,.2f}'
+        msg['Subject'] = f'{symbol} Price Alert: ${current_price:,.2f}'
         msg['From'] = settings.SMTP_FROM_EMAIL
         msg['To'] = user_email
 

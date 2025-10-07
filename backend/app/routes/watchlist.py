@@ -8,8 +8,10 @@ router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 
 @router.post("/", response_model=schemas.WatchlistItemOut)
 def add_item(item: schemas.WatchlistItemCreate, db: Session = Depends(dependencies.get_db), user: models.User = Depends(dependencies.get_current_user)):
-    valid_symbols = set(SYMBOLS.keys())
-    if item.symbol.lower() not in valid_symbols:
+    valid_symbols = set(SYMBOLS.values())
+    print(valid_symbols)
+    print("items requested:", item.symbol.upper())
+    if item.symbol.upper() not in valid_symbols:
         raise HTTPException(status_code=400, detail=f"Invalid symbol. Must be one of {', '.join(valid_symbols)}")
     existing_item = db.query(models.WatchlistItem).filter(
         models.WatchlistItem.user_id == user.id,
