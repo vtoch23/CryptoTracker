@@ -21,7 +21,9 @@ SYMBOLS = {
     "optimism": "OP",
     "injective-protocol": "INJ",
     "near": "NEAR",       
-    "stacks": "STX"      
+    "blockstack": "STX",
+    "cosmos": "ATOM",
+    "celestia": "TIA"
 }
 
 @shared_task(name="app.tasks.fetch_and_store_prices")

@@ -68,7 +68,7 @@ def check_price_alerts():
             target_price = item.target_price
             
             # Check if target price is met
-            if current_price >= target_price:
+            if current_price == target_price:
                 user = db.query(User).filter(User.id == item.user_id).first()
                 
                 if user and user.is_active:
@@ -84,8 +84,8 @@ def check_price_alerts():
                         alerts_sent += 1
                         logger.info(f"📧 Alert sent to {user.email} for {symbol_upper}: ${current_price:.2f} >= ${target_price:.2f}")
                         
-                        # Remove from watchlist after alert (or you can keep it)
-                        db.delete(item)
+                        # Remove from watchlist after alert
+                        # db.delete(item)
                         
                     except Exception as e:
                         logger.error(f"Failed to send alert to {user.email}: {e}")
