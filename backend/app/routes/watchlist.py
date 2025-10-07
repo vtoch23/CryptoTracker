@@ -21,7 +21,7 @@ def add_item(item: schemas.WatchlistItemCreate, db: Session = Depends(dependenci
         raise HTTPException(status_code=400, detail="Target price cannot be negative")
     new_item = models.WatchlistItem(
         user_id=user.id,
-        symbol=item.symbol.lower(),
+        symbol=item.symbol.upper(),
         target_price=item.target_price
     )
     db.add(new_item)
