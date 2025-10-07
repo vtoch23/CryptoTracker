@@ -1,4 +1,3 @@
-# app/tasks/fetch_and_store_prices.py
 from app.database import SessionLocal
 from app.models import PricePoint
 import httpx
@@ -10,16 +9,16 @@ SYMBOLS = {
     "bitcoin": "BTC",
     "ethereum": "ETH",
     "solana": "SOL",
-    "render-token": "RENDER",  # Changed to uppercase
-    "ondo-finance": "ONDO",     # Changed to uppercase
-    "cardano": "ADA",           # Changed to proper ticker
-    "ripple": "XRP",            # Changed to proper ticker
+    "render-token": "RENDER", 
+    "ondo-finance": "ONDO",   
+    "cardano": "ADA",         
+    "ripple": "XRP",        
     "binancecoin": "BNB",
     "aptos": "APT",
     "optimism": "OP",
     "injective-protocol": "INJ",
-    "near": "NEAR",             # Changed to uppercase
-    "stacks": "STX"             # Changed to proper ticker
+    "near": "NEAR",       
+    "stacks": "STX"      
 }
 
 @shared_task(name="app.tasks.fetch_and_store_prices")

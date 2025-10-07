@@ -2,23 +2,19 @@ from pydantic_settings import BaseSettings
 import os
 from dotenv import load_dotenv
 
-# Load environment file first
 load_dotenv(override=True)
 
 
 def running_in_docker() -> bool:
     """Detect if the app is running inside a Docker container."""
-    # Docker sets this file in all containers
     if os.path.exists("/.dockerenv"):
         return True
-    # Common environment variables used in Docker compose
     if os.getenv("DOCKER_CONTAINER") or os.getenv("RUNNING_IN_DOCKER"):
         return True
     return False
 
 
 class Settings(BaseSettings):
-    # Default local config
     DATABASE_URL: str = "postgresql+psycopg2://crypto_user:crypto_pass@localhost:5433/crypto"
     SECRET_KEY: str = "supersecretkey"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
@@ -36,7 +32,6 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# 👇 Dynamically adjust URLs when running inside Docker
 if running_in_docker():
     print("⚙️ Running inside Docker — using container networking")
     settings.DATABASE_URL = "postgresql+psycopg2://postgres:password@db:5432/cryptotracker"
@@ -45,7 +40,6 @@ if running_in_docker():
     settings.CELERY_BROKER_URL = settings.RABBITMQ_URL
 else:
     print("🧑‍💻 Running locally — using localhost networking")
-    # Only override if .env is missing
     settings.DATABASE_URL = "postgresql+psycopg2://crypto_user:crypto_pass@localhost:5433/crypto"
     settings.REDIS_URL = settings.REDIS_URL or "redis://localhost:6379/0"
     settings.RABBITMQ_URL = settings.RABBITMQ_URL or "amqp://guest:guest@localhost:5672//"

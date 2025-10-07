@@ -1,4 +1,3 @@
-# app/temp_create_tables.py
 from app.database import engine
 from app.models import Base
 

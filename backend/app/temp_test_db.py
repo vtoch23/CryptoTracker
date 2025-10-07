@@ -1,4 +1,3 @@
-# temp_test_db.py
 from sqlalchemy import create_engine
 from .config import settings
 

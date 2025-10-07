@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app import models, schemas, dependencies
-from app.tasks.fetch_and_store_prices import SYMBOLS  # Assuming this is updated
+from app.tasks.fetch_and_store_prices import SYMBOLS  
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 

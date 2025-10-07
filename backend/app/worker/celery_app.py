@@ -1,4 +1,3 @@
-# app/worker/celery_app.py
 from celery import Celery
 from app.config import settings
 

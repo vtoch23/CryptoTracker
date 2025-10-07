@@ -1,11 +1,9 @@
-# app/tasks/prices.py
 from celery import Celery
 from app.database import SessionLocal
 from app.models import PricePoint
 import random
 import datetime
 
-# Reuse the celery_app instance from celery_app.py
 from app.worker.celery_app import celery_app as celery
 
 @celery.task

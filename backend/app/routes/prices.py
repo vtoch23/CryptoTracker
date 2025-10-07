@@ -1,4 +1,3 @@
-# app/routes/prices.py
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional, Literal
@@ -14,8 +13,6 @@ def get_latest_prices(db: Session = Depends(dependencies.get_db)):
     Returns the latest price for each symbol.
     """
     try:
-        # Use DISTINCT ON for PostgreSQL (most efficient)
-        # This gets the latest record per symbol based on timestamp
         latest_prices = (
             db.query(models.PricePoint)
             .distinct(models.PricePoint.symbol)
@@ -27,12 +24,10 @@ def get_latest_prices(db: Session = Depends(dependencies.get_db)):
             raise HTTPException(status_code=404, detail="No prices found")
         return latest_prices
     except Exception as e:
-        # If DISTINCT ON doesn't work (not PostgreSQL), fall back to window function approach
         try:
             from sqlalchemy import select
             from sqlalchemy.sql import text
             
-            # Subquery with row_number to get latest per symbol
             subquery = (
                 db.query(
                     models.PricePoint.id,
@@ -75,7 +70,6 @@ def get_price_history(
         symbol = symbol.upper()
 
         if group_by:
-            # Aggregate prices over time windows
             if group_by == "hour":
                 time_trunc = func.date_trunc("hour", models.PricePoint.timestamp)
             elif group_by == "day":
@@ -95,7 +89,6 @@ def get_price_history(
                 .all()
             )
 
-            # Convert SQLAlchemy Row to dicts with ISO timestamps
             return [
                 {
                     "symbol": r.symbol,
