@@ -7,13 +7,18 @@ app = Celery(
     backend=settings.CELERY_RESULT_BACKEND,
 )
 
-app.autodiscover_tasks(["app.tasks"])
+app.autodiscover_tasks(["app.tasks.fetch_and_store_prices", "app.tasks.check_price_alerts"])
+
 print("Celery app initialized")
 
 app.conf.beat_schedule = {
     "fetch-prices-every-5-minutes": {
         "task": "app.tasks.fetch_and_store_prices",
-        "schedule": 300.0,
+        "schedule": 120.0,  # Every 5 minutes
+    },
+    "check-price-alerts": {
+        "task": "app.tasks.check_price_alerts",
+        "schedule": 130.0,  # Every 5 minutes + 10 seconds (runs after fetch)
     },
 }
 
