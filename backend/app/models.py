@@ -25,3 +25,12 @@ class PricePoint(Base):
     symbol = Column(String, index=True)
     price = Column(Float)
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+class CostBasis(Base):
+    __tablename__ = "cost_basis"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    symbol = Column(String, index=True)
+    cost_price = Column(Float)
+    quantity = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)

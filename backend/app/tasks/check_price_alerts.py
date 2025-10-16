@@ -165,9 +165,6 @@ def send_price_alert_email(user_email: str, symbol: str, current_price: float, t
                 <p style="margin: 0 0 8px 0; color: #64748b; font-size: 13px;">
                   Automated alert from Crypto Price Tracker
                 </p>
-                <p style="margin: 0; color: #94a3b8; font-size: 12px;">
-                  This watchlist item has been removed after triggering this alert
-                </p>
               </div>
             </div>
           </body>
