@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { Trash2, Plus, Bell, ChevronDown, X } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -12,7 +13,13 @@ interface CoinPrice {
 interface WatchlistItem {
   id: number;
   symbol: string;
-  target_price?: number;
+  created_at: string;
+}
+
+interface AlertItem {
+  id: number;
+  symbol: string;
+  target_price: number;
   created_at: string;
 }
 
@@ -35,27 +42,27 @@ export default function Dashboard() {
   // State management
   const [prices, setPrices] = useState<CoinPrice[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [costBasis, setCostBasis] = useState<CostBasis[]>([]);
-  const [priceHistory, setPriceHistory] = useState<PriceHistoryItem[]>([]);
+  const [priceHistory, setPriceHistory] = useState<Map<string, PriceHistoryItem[]>>(new Map());
 
   // Form states
-  const [newSymbol, setNewSymbol] = useState("");
-  const [newTargetPrice, setNewTargetPrice] = useState<number | undefined>(undefined);
+  const [newWatchSymbol, setNewWatchSymbol] = useState("");
+  const [alertSymbol, setAlertSymbol] = useState("");
+  const [alertPrice, setAlertPrice] = useState<number | undefined>(undefined);
   const [newCostSymbol, setNewCostSymbol] = useState("");
   const [newCostPrice, setNewCostPrice] = useState<number | undefined>(undefined);
   const [newCostQuantity, setNewCostQuantity] = useState<number | undefined>(undefined);
-  const [selectedHistorySymbol, setSelectedHistorySymbol] = useState<string | null>(null);
 
   // UI states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
 
-  // Redirect if not authenticated
   useEffect(() => {
-    if (!token) {
-      navigate("/login");
-    }
+    if (!token) navigate("/login");
   }, [token, navigate]);
 
   // Fetch all data
@@ -65,29 +72,39 @@ export default function Dashboard() {
       setLoading(true);
       setError("");
 
-      // Fetch prices
       const pricesRes = await axios.get<CoinPrice[]>(`${API_URL}/prices`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setPrices(pricesRes.data);
 
-      // Fetch watchlist
-      const watchlistRes = await axios.get<WatchlistItem[]>(`${API_URL}/watchlist/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setWatchlist(watchlistRes.data);
+      try {
+        const watchlistRes = await axios.get<WatchlistItem[]>(`${API_URL}/watchlist/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setWatchlist(watchlistRes.data);
+      } catch (err) {
+        setWatchlist([]);
+      }
 
-      // Fetch cost basis (assuming endpoint exists)
+      try {
+        const alertsRes = await axios.get<AlertItem[]>(`${API_URL}/alerts/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setAlerts(alertsRes.data);
+      } catch (err) {
+        setAlerts([]);
+      }
+
       try {
         const costRes = await axios.get<CostBasis[]>(`${API_URL}/cost-basis/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setCostBasis(costRes.data);
       } catch (err) {
-        console.log("Cost basis endpoint not available yet");
+        setCostBasis([]);
       }
 
-      setSuccess("Data refreshed successfully!");
+      setSuccess("Data refreshed!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message);
@@ -100,13 +117,13 @@ export default function Dashboard() {
     fetchAllData();
   }, [token]);
 
-  // Trigger fetch from backend
+  // Trigger backend fetch
   const handleTriggerFetch = async () => {
     try {
       setLoading(true);
       await axios.post(`${API_URL}/fetch/fetch`, {});
       await fetchAllData();
-      setSuccess("Price fetch triggered and data updated!");
+      setSuccess("Prices fetched and updated!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message);
@@ -118,21 +135,19 @@ export default function Dashboard() {
   // Add to watchlist
   const handleAddToWatchlist = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSymbol) {
-      setError("Please enter a symbol");
+    if (!newWatchSymbol) {
+      setError("Enter a symbol");
       return;
     }
 
     try {
       const response = await axios.post(
         `${API_URL}/watchlist/`,
-        { symbol: newSymbol, target_price: newTargetPrice || null },
+        { symbol: newWatchSymbol },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       setWatchlist([...watchlist, response.data]);
-      setNewSymbol("");
-      setNewTargetPrice(undefined);
+      setNewWatchSymbol("");
       setSuccess("Added to watchlist!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
@@ -154,47 +169,39 @@ export default function Dashboard() {
     }
   };
 
-  // Add cost basis
-  const handleAddCostBasis = async (e: React.FormEvent) => {
+  // Create alert
+  const handleCreateAlert = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCostSymbol || !newCostPrice || !newCostQuantity) {
-      setError("Please fill in all cost basis fields");
+    if (!alertSymbol || !alertPrice) {
+      setError("Enter symbol and target price");
       return;
     }
 
     try {
       const response = await axios.post(
-        `${API_URL}/cost-basis/`,
-        { 
-          symbol: newCostSymbol, 
-          cost_price: newCostPrice,
-          quantity: newCostQuantity 
-        },
+        `${API_URL}/alerts/`,
+        { symbol: alertSymbol, target_price: alertPrice },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      setCostBasis([...costBasis, response.data]);
-      setNewCostSymbol("");
-      setNewCostPrice(undefined);
-      setNewCostQuantity(undefined);
-      setSuccess("Cost basis added!");
+      setAlerts([...alerts, response.data]);
+      setAlertSymbol("");
+      setAlertPrice(undefined);
+      setShowAlertModal(false);
+      setSuccess("Alert created! Email will be sent when target is reached.");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message);
     }
   };
 
-  // Update cost basis
-  const handleUpdateCostBasis = async (id: number, updatedData: Partial<CostBasis>) => {
+  // Remove alert
+  const handleRemoveAlert = async (id: number) => {
     try {
-      const response = await axios.patch(
-        `${API_URL}/cost-basis/${id}`,
-        updatedData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setCostBasis(costBasis.map((item) => (item.id === id ? response.data : item)));
-      setSuccess("Cost basis updated!");
+      await axios.delete(`${API_URL}/alerts/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAlerts(alerts.filter((item) => item.id !== id));
+      setSuccess("Alert removed!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message);
@@ -204,11 +211,41 @@ export default function Dashboard() {
   // Fetch price history
   const handleFetchHistory = async (symbol: string) => {
     try {
-      setSelectedHistorySymbol(symbol);
+      if (expandedHistory === symbol) {
+        setExpandedHistory(null);
+        return;
+      }
+
+      setExpandedHistory(symbol);
       const res = await axios.get<PriceHistoryItem[]>(`${API_URL}/prices/${symbol}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setPriceHistory(res.data);
+      setPriceHistory(new Map(priceHistory).set(symbol, res.data));
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message);
+    }
+  };
+
+  // Add cost basis
+  const handleAddCostBasis = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCostSymbol || !newCostPrice || !newCostQuantity) {
+      setError("Fill all fields");
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/cost-basis/`,
+        { symbol: newCostSymbol, cost_price: newCostPrice, quantity: newCostQuantity },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setCostBasis([...costBasis, response.data]);
+      setNewCostSymbol("");
+      setNewCostPrice(undefined);
+      setNewCostQuantity(undefined);
+      setSuccess("Purchase tracked!");
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message);
     }
@@ -220,128 +257,121 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-black">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-900 to-slate-950">
       {/* Header */}
-      <header className="bg-slate-900/50 backdrop-blur-md border-b border-slate-700 sticky top-0 z-50">
+      <header className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 backdrop-blur-md border-b border-blue-500/20 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-transparent bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text">
-            CryptoTracker Dashboard
+          <h1 className="text-4xl font-bold text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 bg-clip-text">
+            💎 CryptoTracker
           </h1>
           <button
             onClick={handleLogout}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
+            className="px-6 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/50 rounded-lg transition"
           >
             Logout
           </button>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Alerts */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/20 border border-red-500 text-red-200 rounded-lg">
-            {error}
+          <div className="mb-4 p-4 bg-red-500/20 border border-red-500/50 text-red-200 rounded-lg flex justify-between items-center">
+            <span>{error}</span>
+            <button onClick={() => setError("")} className="text-red-300 hover:text-red-100">
+              <X size={20} />
+            </button>
           </div>
         )}
         {success && (
-          <div className="mb-6 p-4 bg-green-500/20 border border-green-500 text-green-200 rounded-lg">
-            {success}
+          <div className="mb-4 p-4 bg-green-500/20 border border-green-500/50 text-green-200 rounded-lg flex justify-between items-center">
+            <span>{success}</span>
+            <button onClick={() => setSuccess("")} className="text-green-300 hover:text-green-100">
+              <X size={20} />
+            </button>
           </div>
         )}
 
         {/* Action Buttons */}
-        <div className="mb-8 flex gap-4 flex-wrap">
+        <div className="mb-8 flex gap-3 flex-wrap">
           <button
             onClick={handleTriggerFetch}
             disabled={loading}
-            className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 text-white rounded-lg font-medium transition"
+            className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:opacity-50 text-white rounded-lg font-semibold transition shadow-lg"
           >
-            {loading ? "Updating..." : "Refresh All Data"}
+            {loading ? "Updating..." : "Refresh Prices"}
           </button>
           <button
             onClick={fetchAllData}
             disabled={loading}
-            className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition"
+            className="px-6 py-2.5 bg-slate-700/50 hover:bg-slate-700 text-slate-200 rounded-lg font-semibold transition"
           >
             Reload Data
           </button>
         </div>
 
-        {/* Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Left Column */}
-          <div className="space-y-8">
+        {/* Main Grid - 3 Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* LEFT COLUMN - Watchlist & Add */}
+          <div className="space-y-6">
             {/* Add to Watchlist */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-white mb-4">Add to Watchlist</h2>
-              <form onSubmit={handleAddToWatchlist} className="space-y-4">
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Symbol (e.g., BTC)"
-                    value={newSymbol}
-                    onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
-                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    placeholder="Target Price (optional)"
-                    value={newTargetPrice || ""}
-                    onChange={(e) => setNewTargetPrice(e.target.value ? Number(e.target.value) : undefined)}
-                    step="0.01"
-                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400"
-                  />
-                </div>
+            <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+              <h2 className="text-xl font-bold text-blue-200 mb-4">Add to Watchlist</h2>
+              <form onSubmit={handleAddToWatchlist} className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Coin Symbol (e.g., BTC)"
+                  value={newWatchSymbol}
+                  onChange={(e) => setNewWatchSymbol(e.target.value.toUpperCase())}
+                  className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400/50 transition"
+                />
                 <button
                   type="submit"
-                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
+                  className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
                 >
-                  Add to Watchlist
+                  <Plus size={18} /> Add Coin
                 </button>
               </form>
             </div>
 
             {/* Watchlist */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-white mb-4">My Watchlist</h2>
+            <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+              <h2 className="text-xl font-bold text-blue-200 mb-4">My Watchlist</h2>
               {watchlist.length === 0 ? (
-                <p className="text-slate-400">No items in watchlist</p>
+                <p className="text-slate-400 text-center py-8">No coins tracked</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {watchlist.map((item) => {
                     const currentPrice = prices.find((p) => p.symbol === item.symbol)?.price;
-                    const priceStatus =
-                      item.target_price && currentPrice
-                        ? currentPrice >= item.target_price
-                          ? "✓ Target reached!"
-                          : `${((currentPrice / item.target_price - 1) * 100).toFixed(2)}% to target`
-                        : "";
-
                     return (
                       <div
                         key={item.id}
-                        className="bg-slate-700/30 border border-slate-600 rounded p-3 flex justify-between items-center"
+                        className="bg-gradient-to-r from-slate-700/30 to-slate-700/10 border border-slate-600/30 rounded-lg p-3.5 flex justify-between items-center hover:border-blue-400/30 transition"
                       >
-                        <div>
+                        <div className="flex-1">
                           <p className="font-semibold text-white">{item.symbol}</p>
-                          <p className="text-slate-400 text-sm">
-                            Current: ${currentPrice?.toFixed(2) || "N/A"}
+                          <p className="text-green-400 text-sm font-medium">
+                            ${currentPrice?.toFixed(2) || "N/A"}
                           </p>
-                          {item.target_price && (
-                            <p className="text-slate-400 text-sm">
-                              Target: ${item.target_price.toFixed(2)} - {priceStatus}
-                            </p>
-                          )}
                         </div>
-                        <button
-                          onClick={() => handleRemoveFromWatchlist(item.id)}
-                          className="px-3 py-1 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded transition"
-                        >
-                          Remove
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setAlertSymbol(item.symbol);
+                              setShowAlertModal(true);
+                            }}
+                            className="p-2 bg-yellow-600/30 hover:bg-yellow-600/50 text-yellow-300 rounded-lg transition"
+                            title="Set price alert"
+                          >
+                            <Bell size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleRemoveFromWatchlist(item.id)}
+                            className="p-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded-lg transition"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -350,26 +380,76 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Right Column */}
-          <div className="space-y-8">
-            {/* Latest Prices */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-white mb-4">Current Prices</h2>
-              {prices.length === 0 ? (
-                <p className="text-slate-400">No price data available</p>
-              ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {prices.map((coin) => (
-                    <div key={coin.symbol} className="bg-slate-700/30 rounded p-3 flex justify-between items-center">
-                      <div>
+          {/* MIDDLE COLUMN - Prices with inline History */}
+          <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl h-fit">
+            <h2 className="text-xl font-bold text-blue-200 mb-4">Current Prices</h2>
+            {prices.length === 0 ? (
+              <p className="text-slate-400 text-center py-8">No price data</p>
+            ) : (
+              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-2">
+                {prices.map((coin) => (
+                  <div key={coin.symbol}>
+                    <button
+                      onClick={() => handleFetchHistory(coin.symbol)}
+                      className="w-full bg-gradient-to-r from-slate-700/30 to-slate-700/10 border border-slate-600/30 rounded-lg p-3.5 flex justify-between items-center hover:border-purple-400/30 transition text-left"
+                    >
+                      <div className="flex-1">
                         <p className="font-semibold text-white">{coin.symbol}</p>
-                        <p className="text-green-400">${coin.price.toFixed(2)}</p>
+                        <p className="text-green-400 text-sm font-medium">${coin.price.toFixed(2)}</p>
+                      </div>
+                      <ChevronDown
+                        size={18}
+                        className={`text-slate-400 transition ${
+                          expandedHistory === coin.symbol ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {/* Inline History */}
+                    {expandedHistory === coin.symbol && priceHistory.has(coin.symbol) && (
+                      <div className="bg-slate-700/20 border border-slate-600/20 rounded-lg mt-2 p-4 ml-2">
+                        <p className="text-slate-300 text-sm font-semibold mb-3">Price History</p>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {priceHistory.get(coin.symbol)?.slice(0, 10).map((item, idx) => (
+                            <div key={idx} className="flex justify-between text-sm">
+                              <span className="text-slate-400">
+                                {new Date(item.timestamp).toLocaleDateString()}
+                              </span>
+                              <span className="text-green-400 font-medium">${item.price.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT COLUMN - Alerts & Cost Tracking */}
+          <div className="space-y-6">
+            {/* Active Alerts */}
+            <div className="bg-slate-800/40 border border-yellow-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+              <h2 className="text-xl font-bold text-yellow-200 mb-4">Active Alerts</h2>
+              {alerts.length === 0 ? (
+                <p className="text-slate-400 text-center py-8">No alerts set</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className="bg-gradient-to-r from-yellow-700/20 to-yellow-700/5 border border-yellow-600/30 rounded-lg p-3.5 flex justify-between items-center"
+                    >
+                      <div>
+                        <p className="font-semibold text-white">{alert.symbol}</p>
+                        <p className="text-yellow-300 text-sm">Target: ${alert.target_price.toFixed(2)}</p>
                       </div>
                       <button
-                        onClick={() => handleFetchHistory(coin.symbol)}
-                        className="px-3 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded transition text-sm"
+                        onClick={() => handleRemoveAlert(alert.id)}
+                        className="p-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded-lg transition"
                       >
-                        History
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   ))}
@@ -378,135 +458,161 @@ export default function Dashboard() {
             </div>
 
             {/* Add Cost Basis */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-white mb-4">Track Purchase Cost</h2>
-              <form onSubmit={handleAddCostBasis} className="space-y-4">
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Symbol"
-                    value={newCostSymbol}
-                    onChange={(e) => setNewCostSymbol(e.target.value.toUpperCase())}
-                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    placeholder="Cost Price"
-                    value={newCostPrice || ""}
-                    onChange={(e) => setNewCostPrice(e.target.value ? Number(e.target.value) : undefined)}
-                    step="0.01"
-                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    placeholder="Quantity"
-                    value={newCostQuantity || ""}
-                    onChange={(e) => setNewCostQuantity(e.target.value ? Number(e.target.value) : undefined)}
-                    step="0.01"
-                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400"
-                  />
-                </div>
+            <div className="bg-slate-800/40 border border-green-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+              <h2 className="text-xl font-bold text-green-200 mb-4">Track Purchase</h2>
+              <form onSubmit={handleAddCostBasis} className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Symbol"
+                  value={newCostSymbol}
+                  onChange={(e) => setNewCostSymbol(e.target.value.toUpperCase())}
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+                />
+                <input
+                  type="number"
+                  placeholder="Cost Price"
+                  value={newCostPrice || ""}
+                  onChange={(e) => setNewCostPrice(e.target.value ? Number(e.target.value) : undefined)}
+                  step="0.01"
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+                />
+                <input
+                  type="number"
+                  placeholder="Quantity"
+                  value={newCostQuantity || ""}
+                  onChange={(e) => setNewCostQuantity(e.target.value ? Number(e.target.value) : undefined)}
+                  step="0.01"
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+                />
                 <button
                   type="submit"
-                  className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition"
+                  className="w-full px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 text-sm"
                 >
-                  Add Purchase
+                  <Plus size={16} /> Track Purchase
                 </button>
               </form>
             </div>
           </div>
         </div>
 
-        {/* Cost Basis List */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 mb-8">
-          <h2 className="text-2xl font-bold text-white mb-4">Purchase History</h2>
+        {/* BOTTOM SECTION - Purchase History Table */}
+        <div className="bg-slate-800/40 border border-green-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl mb-8">
+          <h2 className="text-2xl font-bold text-green-200 mb-6">Purchase History</h2>
           {costBasis.length === 0 ? (
-            <p className="text-slate-400">No purchase history yet</p>
+            <p className="text-slate-400 text-center py-12">No purchases tracked yet</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-white">
+              <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-600">
-                    <th className="px-4 py-3 text-left">Symbol</th>
-                    <th className="px-4 py-3 text-left">Cost Price</th>
-                    <th className="px-4 py-3 text-left">Quantity</th>
-                    <th className="px-4 py-3 text-left">Total</th>
-                    <th className="px-4 py-3 text-left">Action</th>
+                  <tr className="border-b border-slate-600/50">
+                    <th className="px-4 py-3 text-left text-green-300 font-semibold">Symbol</th>
+                    <th className="px-4 py-3 text-left text-green-300 font-semibold">Cost Price</th>
+                    <th className="px-4 py-3 text-left text-green-300 font-semibold">Quantity</th>
+                    <th className="px-4 py-3 text-left text-green-300 font-semibold">Total Investment</th>
+                    <th className="px-4 py-3 text-left text-green-300 font-semibold">Current Value</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {costBasis.map((item) => (
-                    <tr key={item.id} className="border-b border-slate-700 hover:bg-slate-700/30">
-                      <td className="px-4 py-3">{item.symbol}</td>
-                      <td className="px-4 py-3">${item.cost_price.toFixed(2)}</td>
-                      <td className="px-4 py-3">{item.quantity}</td>
-                      <td className="px-4 py-3">${(item.cost_price * item.quantity).toFixed(2)}</td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => {
-                            const newPrice = prompt("Enter new cost price:", String(item.cost_price));
-                            if (newPrice) {
-                              handleUpdateCostBasis(item.id, { cost_price: Number(newPrice) });
-                            }
-                          }}
-                          className="px-2 py-1 bg-yellow-600/30 hover:bg-yellow-600/50 text-yellow-300 rounded transition text-sm"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {costBasis.map((item) => {
+                    const currentPrice = prices.find((p) => p.symbol === item.symbol)?.price || 0;
+                    const totalInvestment = item.cost_price * item.quantity;
+                    const currentValue = currentPrice * item.quantity;
+                    const gainLoss = currentValue - totalInvestment;
+                    const gainLossPercent = ((gainLoss / totalInvestment) * 100).toFixed(2);
+
+                    return (
+                      <tr key={item.id} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition">
+                        <td className="px-4 py-3 font-semibold text-white">{item.symbol}</td>
+                        <td className="px-4 py-3 text-slate-300">${item.cost_price.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-slate-300">{item.quantity}</td>
+                        <td className="px-4 py-3 text-slate-300">${totalInvestment.toFixed(2)}</td>
+                        <td className="px-4 py-3">
+                          <span className={gainLoss >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
+                            ${currentValue.toFixed(2)}
+                            <span className="text-xs ml-2">
+                              ({gainLoss >= 0 ? "+" : ""}{gainLossPercent}%)
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </div>
+      </main>
 
-        {/* Price History Modal */}
-        {selectedHistorySymbol && (
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-white">{selectedHistorySymbol} Price History</h2>
+      {/* Alert Modal */}
+      {showAlertModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-yellow-500/30 rounded-xl p-8 max-w-md w-full shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-yellow-200">Set Price Alert</h3>
               <button
                 onClick={() => {
-                  setSelectedHistorySymbol(null);
-                  setPriceHistory([]);
+                  setShowAlertModal(false);
+                  setAlertSymbol("");
+                  setAlertPrice(undefined);
                 }}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white transition"
               >
-                ✕
+                <X size={24} />
               </button>
             </div>
 
-            {priceHistory.length === 0 ? (
-              <p className="text-slate-400">No history data available</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-white">
-                  <thead>
-                    <tr className="border-b border-slate-600">
-                      <th className="px-4 py-3 text-left">Timestamp</th>
-                      <th className="px-4 py-3 text-left">Price</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {priceHistory.map((item, idx) => (
-                      <tr key={idx} className="border-b border-slate-700 hover:bg-slate-700/30">
-                        <td className="px-4 py-3">{new Date(item.timestamp).toLocaleString()}</td>
-                        <td className="px-4 py-3">${item.price.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <form onSubmit={handleCreateAlert} className="space-y-4">
+              <div>
+                <label className="block text-slate-300 text-sm font-medium mb-2">Coin Symbol</label>
+                <input
+                  type="text"
+                  placeholder="e.g., BTC"
+                  value={alertSymbol}
+                  onChange={(e) => setAlertSymbol(e.target.value.toUpperCase())}
+                  className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-yellow-400/50 transition"
+                />
               </div>
-            )}
+
+              <div>
+                <label className="block text-slate-300 text-sm font-medium mb-2">Target Price ($)</label>
+                <input
+                  type="number"
+                  placeholder="50000"
+                  value={alertPrice || ""}
+                  onChange={(e) => setAlertPrice(e.target.value ? Number(e.target.value) : undefined)}
+                  step="0.01"
+                  className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-yellow-400/50 transition"
+                />
+              </div>
+
+              <p className="text-slate-400 text-sm">
+                Email alert will be sent when {alertSymbol || "the coin"} reaches ${alertPrice || "your target price"}
+              </p>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAlertModal(false);
+                    setAlertSymbol("");
+                    setAlertPrice(undefined);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white rounded-lg font-medium transition"
+                >
+                  Create Alert
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
   );
 }
