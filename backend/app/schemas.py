@@ -38,3 +38,18 @@ class PricePointOut(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class CostBasisCreate(BaseModel):
+    symbol: str
+    cost_price: float
+    quantity: float
+
+class CostBasisOut(BaseModel):
+    id: int
+    symbol: str
+    cost_price: float
+    quantity: float
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

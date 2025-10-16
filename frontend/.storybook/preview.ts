@@ -1,13 +1,10 @@
-import type { Preview } from '@storybook/angular'
+import '../src/index.css';
+import type { Preview } from '@storybook/react';
 
 const preview: Preview = {
   parameters: {
-    controls: {
-      matchers: {
-       color: /(background|color)$/i,
-       date: /Date$/i,
-      },
-    },
+    actions: { argTypesRegex: '^on[A-Z].*' },
+    controls: { matchers: { color: /(background|color)$/i, date: /Date$/ } },
   },
 };
 
