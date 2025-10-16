@@ -143,7 +143,7 @@ export default function Dashboard() {
     try {
       const response = await axios.post(
         `${API_URL}/watchlist/`,
-        { symbol: newWatchSymbol },
+        { symbol: newWatchSymbol.toLowerCase() },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setWatchlist([...watchlist, response.data]);
@@ -261,8 +261,8 @@ export default function Dashboard() {
       {/* Header */}
       <header className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 backdrop-blur-md border-b border-blue-500/20 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-4xl font-bold text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 bg-clip-text">
-            💎 CryptoTracker
+          <h1 className="text-4xl font-bold text-white bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 bg-clip-text">
+            Crypto Tracker
           </h1>
           <button
             onClick={handleLogout}
@@ -311,28 +311,10 @@ export default function Dashboard() {
         </div>
 
         {/* Main Grid - 3 Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-7 lg:grid-cols-6 gap-8 mb-8">
           {/* LEFT COLUMN - Watchlist & Add */}
-          <div className="space-y-6">
-            {/* Add to Watchlist */}
-            <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
-              <h2 className="text-xl font-bold text-blue-200 mb-4">Add to Watchlist</h2>
-              <form onSubmit={handleAddToWatchlist} className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Coin Symbol (e.g., BTC)"
-                  value={newWatchSymbol}
-                  onChange={(e) => setNewWatchSymbol(e.target.value.toUpperCase())}
-                  className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400/50 transition"
-                />
-                <button
-                  type="submit"
-                  className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
-                >
-                  <Plus size={18} /> Add Coin
-                </button>
-              </form>
-            </div>
+          <div className="space-y-6 col-span-3">
+
 
             {/* Watchlist */}
             <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
@@ -378,15 +360,34 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+            {/* Add to Watchlist */}
+            <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+              <h2 className="text-xl font-bold text-blue-200 mb-4">Add to Watchlist</h2>
+              <form onSubmit={handleAddToWatchlist} className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Coin Symbol (e.g., BTC)"
+                  value={newWatchSymbol}
+                  onChange={(e) => setNewWatchSymbol(e.target.value.toUpperCase())}
+                  className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400/50 transition"
+                />
+                <button
+                  type="submit"
+                  className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                >
+                  <Plus size={18} /> Add Coin
+                </button>
+              </form>
+            </div>
           </div>
 
           {/* MIDDLE COLUMN - Prices with inline History */}
-          <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl h-fit">
+          <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl  col-span-2">
             <h2 className="text-xl font-bold text-blue-200 mb-4">Current Prices</h2>
             {prices.length === 0 ? (
               <p className="text-slate-400 text-center py-8">No price data</p>
             ) : (
-              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-2">
+              <div className="space-y-2.5 max-h-full overflow-y-auto pr-2">
                 {prices.map((coin) => (
                   <div key={coin.symbol}>
                     <button
@@ -399,9 +400,8 @@ export default function Dashboard() {
                       </div>
                       <ChevronDown
                         size={18}
-                        className={`text-slate-400 transition ${
-                          expandedHistory === coin.symbol ? "rotate-180" : ""
-                        }`}
+                        className={`text-slate-400 transition ${expandedHistory === coin.symbol ? "rotate-180" : ""
+                          }`}
                       />
                     </button>
 
@@ -409,11 +409,11 @@ export default function Dashboard() {
                     {expandedHistory === coin.symbol && priceHistory.has(coin.symbol) && (
                       <div className="bg-slate-700/20 border border-slate-600/20 rounded-lg mt-2 p-4 ml-2">
                         <p className="text-slate-300 text-sm font-semibold mb-3">Price History</p>
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                        <div className="space-y-2 max-h-300 overflow-y-auto">
                           {priceHistory.get(coin.symbol)?.slice(0, 10).map((item, idx) => (
                             <div key={idx} className="flex justify-between text-sm">
                               <span className="text-slate-400">
-                                {new Date(item.timestamp).toLocaleDateString()}
+                                {new Date(item.timestamp).toDateString()}
                               </span>
                               <span className="text-green-400 font-medium">${item.price.toFixed(2)}</span>
                             </div>
@@ -428,7 +428,7 @@ export default function Dashboard() {
           </div>
 
           {/* RIGHT COLUMN - Alerts & Cost Tracking */}
-          <div className="space-y-6">
+          <div className="space-y-6 col-span-2">
             {/* Active Alerts */}
             <div className="bg-slate-800/40 border border-yellow-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
               <h2 className="text-xl font-bold text-yellow-200 mb-4">Active Alerts</h2>
@@ -457,44 +457,44 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Add Cost Basis */}
-            <div className="bg-slate-800/40 border border-green-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
-              <h2 className="text-xl font-bold text-green-200 mb-4">Track Purchase</h2>
-              <form onSubmit={handleAddCostBasis} className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Symbol"
-                  value={newCostSymbol}
-                  onChange={(e) => setNewCostSymbol(e.target.value.toUpperCase())}
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
-                />
-                <input
-                  type="number"
-                  placeholder="Cost Price"
-                  value={newCostPrice || ""}
-                  onChange={(e) => setNewCostPrice(e.target.value ? Number(e.target.value) : undefined)}
-                  step="0.01"
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
-                />
-                <input
-                  type="number"
-                  placeholder="Quantity"
-                  value={newCostQuantity || ""}
-                  onChange={(e) => setNewCostQuantity(e.target.value ? Number(e.target.value) : undefined)}
-                  step="0.01"
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
-                />
-                <button
-                  type="submit"
-                  className="w-full px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 text-sm"
-                >
-                  <Plus size={16} /> Track Purchase
-                </button>
-              </form>
-            </div>
+
           </div>
         </div>
-
+        {/* BOTTOM SECTION Add Cost Basis */}
+        <div className="bg-slate-800/40 border border-green-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+          <h2 className="text-xl font-bold text-green-200 mb-4">Track Purchase</h2>
+          <form onSubmit={handleAddCostBasis} className="space-y-3">
+            <input
+              type="text"
+              placeholder="Symbol"
+              value={newCostSymbol}
+              onChange={(e) => setNewCostSymbol(e.target.value.toUpperCase())}
+              className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+            />
+            <input
+              type="number"
+              placeholder="Cost Price"
+              value={newCostPrice || ""}
+              onChange={(e) => setNewCostPrice(e.target.value ? Number(e.target.value) : undefined)}
+              step="0.01"
+              className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+            />
+            <input
+              type="number"
+              placeholder="Quantity"
+              value={newCostQuantity || ""}
+              onChange={(e) => setNewCostQuantity(e.target.value ? Number(e.target.value) : undefined)}
+              step="0.01"
+              className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+            />
+            <button
+              type="submit"
+              className="w-full px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 text-sm"
+            >
+              <Plus size={16} /> Track Purchase
+            </button>
+          </form>
+        </div>
         {/* BOTTOM SECTION - Purchase History Table */}
         <div className="bg-slate-800/40 border border-green-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl mb-8">
           <h2 className="text-2xl font-bold text-green-200 mb-6">Purchase History</h2>
@@ -510,6 +510,7 @@ export default function Dashboard() {
                     <th className="px-4 py-3 text-left text-green-300 font-semibold">Quantity</th>
                     <th className="px-4 py-3 text-left text-green-300 font-semibold">Total Investment</th>
                     <th className="px-4 py-3 text-left text-green-300 font-semibold">Current Value</th>
+                    <th className="px-4 py-3 text-left text-green-300 font-semibold">Cost change</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -531,6 +532,14 @@ export default function Dashboard() {
                             ${currentValue.toFixed(2)}
                             <span className="text-xs ml-2">
                               ({gainLoss >= 0 ? "+" : ""}{gainLossPercent}%)
+                            </span>
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={gainLoss >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
+                            ${gainLoss.toFixed(2)}
+                            <span className="text-xs ml-2">
+                              {gainLoss >= 0 ? "⬆" : "⬇"}
                             </span>
                           </span>
                         </td>

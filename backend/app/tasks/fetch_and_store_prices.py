@@ -4,27 +4,25 @@ import httpx
 import datetime
 from celery import shared_task
 import logging
+from pycoingecko import CoinGeckoAPI
+
+cg = CoinGeckoAPI()
+
+coin_list = cg.get_coins_list()
+
 
 logger = logging.getLogger(__name__)
 
 COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price"
-SYMBOLS = {
-    "bitcoin": "BTC",
-    "ethereum": "ETH",
-    "solana": "SOL",
-    "render-token": "RENDER", 
-    "ondo-finance": "ONDO",   
-    "cardano": "ADA",         
-    "ripple": "XRP",        
-    "binancecoin": "BNB",
-    "aptos": "APT",
-    "optimism": "OP",
-    "injective-protocol": "INJ",
-    "near": "NEAR",       
-    "blockstack": "STX",
-    "cosmos": "ATOM",
-    "celestia": "TIA"
-}
+SYMBOLS = {}
+
+for coin in coin_list:
+    SYMBOLS[coin['name']] = coin['symbol']
+    # print(f"ID: {coin['id']}, Symbol: {coin['symbol']}, Name: {coin['name']}")
+
+print(SYMBOLS)
+# for key, value in SYMBOLS.items():
+#     print("name", key, "symbol", value)
 
 @shared_task(name="app.tasks.fetch_and_store_prices")
 def fetch_and_store_prices():

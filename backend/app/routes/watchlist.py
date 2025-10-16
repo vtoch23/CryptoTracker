@@ -27,7 +27,7 @@ def add_item(
     """Add a coin to watchlist (no target price needed)"""
     valid_symbols = set(SYMBOLS.values())
     
-    if item.symbol.upper() not in valid_symbols:
+    if item.symbol.lower() not in valid_symbols:
         raise HTTPException(
             status_code=400, 
             detail=f"Invalid symbol. Must be one of {', '.join(sorted(valid_symbols))}"
