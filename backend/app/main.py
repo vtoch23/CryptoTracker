@@ -6,6 +6,7 @@ from app.routes.alerts import router as alerts_router
 from app.routes.prices import router as prices_router
 from app.routes.fetch import router as fetch_router
 from app.routes import cost_basis
+from app.routes import charts
 
 app = FastAPI(title="CryptoTracker API", debug=True)
 
@@ -27,3 +28,4 @@ app.include_router(alerts_router)
 app.include_router(prices_router)
 app.include_router(fetch_router)
 app.include_router(cost_basis.router)
+app.include_router(charts.router)

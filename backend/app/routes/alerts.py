@@ -24,19 +24,11 @@ def create_alert(
     db: Session = Depends(dependencies.get_db), 
     user: models.User = Depends(dependencies.get_current_user)
 ):
-    """Create a price alert for a coin"""
-    # Check if alert already exists for this symbol
-    existing_alert = db.query(models.WatchlistItem).filter(
-        models.WatchlistItem.user_id == user.id,
-        models.WatchlistItem.symbol == item.symbol.upper(),
-        models.WatchlistItem.target_price.isnot(None)
-    ).first()
-    
-    if existing_alert:
-        raise HTTPException(status_code=400, detail=f"Alert already exists for {item.symbol}")
+    """Create a price alert for a coin - MULTIPLE ALERTS PER COIN ALLOWED"""
     
     if item.target_price < 0:
         raise HTTPException(status_code=400, detail="Target price cannot be negative")
+    
     
     new_alert = models.WatchlistItem(
         user_id=user.id,
