@@ -64,8 +64,8 @@ def get_watchlist(
         models.WatchlistItem.target_price.is_(None)  # Only watchlist items
     ).all()
     
-    if not items:
-        raise HTTPException(status_code=404, detail="Watchlist is empty")
+    # if not items:
+    #     raise HTTPException(status_code=404, detail="Watchlist is empty")
     return items
 
 @router.delete("/{item_id}", status_code=204)

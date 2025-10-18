@@ -17,7 +17,7 @@ COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price"
 SYMBOLS = {}
 
 for coin in coin_list:
-    SYMBOLS[coin['name']] = coin['symbol']
+    SYMBOLS[coin['id']] = coin['symbol']
 
 
 def get_available_coins():
