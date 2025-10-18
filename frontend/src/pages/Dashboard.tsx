@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Trash2, Plus, Bell, ChevronDown, X, Search, BarChart3 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = "http://localhost:8000";
 
 interface CoinPrice {
   symbol: string;
@@ -12,7 +11,13 @@ interface CoinPrice {
 interface WatchlistItem {
   id: number;
   symbol: string;
-  target_price?: number;
+  created_at: string;
+}
+
+interface AlertItem {
+  id: number;
+  symbol: string;
+  target_price: number;
   created_at: string;
 }
 
@@ -23,490 +28,1008 @@ interface CostBasis {
   quantity: number;
 }
 
-interface PriceHistoryItem {
-  timestamp: string;
-  price: number;
+interface CoinOption {
+  id: string;
+  symbol: string;
+}
+
+interface HistoryItem {
+  timestamp: number;
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+interface Candle {
+  timestamp: number;
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  x: string;
+}
+
+function SearchableDropdown({
+  options,
+  value,
+  onChange,
+  placeholder,
+}: {
+  options: CoinOption[];
+  value: string;
+  onChange: (symbol: string) => void;
+  placeholder: string;
+}) {
+  const [search, setSearch] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = useMemo(() => {
+    if (!search) return options.slice(0, 100);
+    return options
+      .filter((opt) =>
+        opt.symbol.toLowerCase().startsWith(search.toLowerCase()) ||
+        opt.id.toLowerCase().startsWith(search.toLowerCase())
+      )
+      .slice(0, 100);
+  }, [search, options]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative z-50" ref={containerRef}>
+      <div className="flex gap-2 items-center">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
+          <input
+            type="text"
+            placeholder={placeholder}
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setIsOpen(true);
+            }}
+            onFocus={() => setIsOpen(true)}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400/50 transition"
+          />
+        </div>
+        {value && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setSearch("");
+            }}
+            className="px-3 py-2.5 bg-slate-700/50 hover:bg-slate-600 text-white rounded-lg transition"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {isOpen && filtered.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-2xl z-50 max-h-64 overflow-y-auto">
+          {filtered.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => {
+                onChange(option.symbol);
+                setSearch(option.symbol);
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-2.5 hover:bg-slate-600 text-white text-left text-sm border-b border-slate-600 last:border-b-0 transition"
+            >
+              <span className="font-semibold">{option.symbol.toUpperCase()}</span>
+              <span className="text-slate-400"> - {option.id}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CandleChart({ candles }: { candles: Candle[] }) {
+  if (!candles || candles.length === 0) return <div className="text-slate-400 text-sm">No chart data</div>;
+
+  const highs = candles.map(c => c.high);
+  const lows = candles.map(c => c.low);
+  const maxPrice = Math.max(...highs);
+  const minPrice = Math.min(...lows);
+  const range = maxPrice - minPrice || 1;
+
+  return (
+    <div className="h-56 flex items-end gap-1 bg-slate-900/30 rounded p-4">
+      {candles.slice(-80).map((candle, idx) => {
+        const openNorm = (candle.open - minPrice) / range;
+        const closeNorm = (candle.close - minPrice) / range;
+        const highNorm = (candle.high - minPrice) / range;
+        const lowNorm = (candle.low - minPrice) / range;
+
+        const bodyTop = Math.max(openNorm, closeNorm);
+        const bodyBottom = Math.min(openNorm, closeNorm);
+        const bodyHeight = Math.max((bodyTop - bodyBottom) * 100, 2);
+        const wickTop = (highNorm - bodyTop) * 100;
+        const wickBottom = (bodyBottom - lowNorm) * 100;
+
+        const isGreen = candle.close >= candle.open;
+
+        return (
+          <div
+            key={`candle-${idx}`}
+            className="flex-1 flex flex-col items-center justify-end"
+            title={`${candle.date}: O:${candle.open.toFixed(2)} H:${candle.high.toFixed(2)} L:${candle.low.toFixed(2)} C:${candle.close.toFixed(2)}`}
+          >
+            {wickTop > 0 && (
+              <div className="w-0.5 bg-slate-500" style={{ height: `${wickTop}%` }} />
+            )}
+            <div
+              className={`w-full ${isGreen ? "bg-green-500" : "bg-red-500"}`}
+              style={{ height: `${bodyHeight}%`, minHeight: "2px" }}
+            />
+            {wickBottom > 0 && (
+              <div className="w-0.5 bg-slate-500" style={{ height: `${wickBottom}%` }} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const token = window.localStorage.getItem("token");
+  const token = typeof window !== 'undefined' ? window.localStorage?.getItem("token") : null;
+  const marketSearchRef = useRef<HTMLDivElement>(null);
 
-  // State management
   const [prices, setPrices] = useState<CoinPrice[]>([]);
+  const [allCoins, setAllCoins] = useState<CoinOption[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [costBasis, setCostBasis] = useState<CostBasis[]>([]);
-  const [priceHistory, setPriceHistory] = useState<PriceHistoryItem[]>([]);
+  const [candles, setCandles] = useState<Map<string, Candle[]>>(new Map());
+  const [history, setHistory] = useState<Map<string, HistoryItem[]>>(new Map());
 
-  // Form states
-  const [newSymbol, setNewSymbol] = useState("");
-  const [newTargetPrice, setNewTargetPrice] = useState<number | undefined>(undefined);
+  const [selectedCoin, setSelectedCoin] = useState("");
+  const [alertPrice, setAlertPrice] = useState<number | undefined>(undefined);
   const [newCostSymbol, setNewCostSymbol] = useState("");
   const [newCostPrice, setNewCostPrice] = useState<number | undefined>(undefined);
   const [newCostQuantity, setNewCostQuantity] = useState<number | undefined>(undefined);
-  const [selectedHistorySymbol, setSelectedHistorySymbol] = useState<string | null>(null);
+  const [searchCoin, setSearchCoin] = useState("");
+  const [marketSearchOpen, setMarketSearchOpen] = useState(false);
 
-  // UI states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [expandedCharts, setExpandedCharts] = useState<Set<string>>(new Set());
+  const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set());
+  const [expandedPurchaseHistory, setExpandedPurchaseHistory] = useState<Set<string>>(new Set());
 
-  // Redirect if not authenticated
+
   useEffect(() => {
-    if (!token) {
-      navigate("/login");
-    }
-  }, [token, navigate]);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (marketSearchRef.current && !marketSearchRef.current.contains(event.target as Node)) {
+        setMarketSearchOpen(false);
+      }
+    };
 
-  // Fetch all data
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const fetchAllCoins = async () => {
+    try {
+      const response = await fetch(`${API_URL}/charts/available-coins`);
+      const data = await response.json();
+      setAllCoins(data);
+    } catch (err) {
+      console.log("Coin list fetch failed");
+    }
+  };
+
   const fetchAllData = async () => {
     if (!token) return;
     try {
       setLoading(true);
       setError("");
 
-      // Fetch prices
-      const pricesRes = await axios.get<CoinPrice[]>(`${API_URL}/prices`, {
+      const pricesRes = await fetch(`${API_URL}/prices`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setPrices(pricesRes.data);
+      const pricesData = await pricesRes.json();
+      setPrices(pricesData);
 
-      // Fetch watchlist
-      const watchlistRes = await axios.get<WatchlistItem[]>(`${API_URL}/watchlist/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setWatchlist(watchlistRes.data);
-
-      // Fetch cost basis (assuming endpoint exists)
       try {
-        const costRes = await axios.get<CostBasis[]>(`${API_URL}/cost-basis/`, {
+        const watchlistRes = await fetch(`${API_URL}/watchlist/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setCostBasis(costRes.data);
+        const watchlistData = await watchlistRes.json();
+        setWatchlist(watchlistData);
       } catch (err) {
-        console.log("Cost basis endpoint not available yet");
+        setWatchlist([]);
       }
 
-      setSuccess("Data refreshed successfully!");
+      try {
+        const alertsRes = await fetch(`${API_URL}/alerts/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const alertsData = await alertsRes.json();
+        setAlerts(alertsData);
+      } catch (err) {
+        setAlerts([]);
+      }
+
+      try {
+        const costRes = await fetch(`${API_URL}/cost-basis/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const costData = await costRes.json();
+        setCostBasis(costData);
+      } catch (err) {
+        setCostBasis([]);
+      }
+
+      setSuccess("Data refreshed!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || "Error loading data");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    fetchAllCoins();
     fetchAllData();
   }, [token]);
 
-  // Trigger fetch from backend
   const handleTriggerFetch = async () => {
     try {
       setLoading(true);
-      await axios.post(`${API_URL}/fetch/fetch`, {});
+      await fetch(`${API_URL}/fetch/fetch`, { method: 'POST' });
       await fetchAllData();
-      setSuccess("Price fetch triggered and data updated!");
+      setSuccess("Prices fetched and updated!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || "Error fetching prices");
     } finally {
       setLoading(false);
     }
   };
 
-  // Add to watchlist
   const handleAddToWatchlist = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSymbol) {
-      setError("Please enter a symbol");
+    if (!selectedCoin) {
+      setError("Select a coin");
       return;
     }
 
     try {
-      const response = await axios.post(
-        `${API_URL}/watchlist/`,
-        { symbol: newSymbol, target_price: newTargetPrice || null },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setWatchlist([...watchlist, response.data]);
-      setNewSymbol("");
-      setNewTargetPrice(undefined);
+      const response = await fetch(`${API_URL}/watchlist/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ symbol: selectedCoin })
+      });
+      const data = await response.json();
+      setWatchlist([...watchlist, data]);
+      setSelectedCoin("");
       setSuccess("Added to watchlist!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || "Error adding to watchlist");
     }
   };
 
-  // Remove from watchlist
   const handleRemoveFromWatchlist = async (id: number) => {
     try {
-      await axios.delete(`${API_URL}/watchlist/${id}`, {
+      await fetch(`${API_URL}/watchlist/${id}`, {
+        method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
       setWatchlist(watchlist.filter((item) => item.id !== id));
       setSuccess("Removed from watchlist!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || "Error removing from watchlist");
     }
   };
 
-  // Add cost basis
-  const handleAddCostBasis = async (e: React.FormEvent) => {
+  const handleCreateAlert = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCostSymbol || !newCostPrice || !newCostQuantity) {
-      setError("Please fill in all cost basis fields");
+    if (!selectedCoin || !alertPrice) {
+      setError("Select coin and enter target price");
       return;
     }
 
     try {
-      const response = await axios.post(
-        `${API_URL}/cost-basis/`,
-        { 
-          symbol: newCostSymbol, 
-          cost_price: newCostPrice,
-          quantity: newCostQuantity 
+      const response = await fetch(`${API_URL}/alerts/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+        body: JSON.stringify({ symbol: selectedCoin, target_price: alertPrice })
+      });
+      const data = await response.json();
+      setAlerts([...alerts, data]);
+      setAlertPrice(undefined);
+      setShowAlertModal(false);
+      setSuccess("Alert created!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: any) {
+      setError(err.message || "Error creating alert");
+    }
+  };
 
-      setCostBasis([...costBasis, response.data]);
+  const handleRemoveAlert = async (id: number) => {
+    try {
+      await fetch(`${API_URL}/alerts/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAlerts(alerts.filter((item) => item.id !== id));
+      setSuccess("Alert removed!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: any) {
+      setError(err.message || "Error removing alert");
+    }
+  };
+
+  const handleAddCostBasis = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCostSymbol || !newCostPrice || !newCostQuantity) {
+      setError("Fill all fields");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/cost-basis/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ symbol: newCostSymbol, cost_price: newCostPrice, quantity: newCostQuantity })
+      });
+      const data = await response.json();
+      setCostBasis([...costBasis, data]);
       setNewCostSymbol("");
       setNewCostPrice(undefined);
       setNewCostQuantity(undefined);
-      setSuccess("Cost basis added!");
+      setSuccess("Purchase tracked!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || "Error adding purchase");
     }
   };
 
-  // Update cost basis
-  const handleUpdateCostBasis = async (id: number, updatedData: Partial<CostBasis>) => {
+  const handleDeleteCostBasis = async (id: number) => {
     try {
-      const response = await axios.patch(
-        `${API_URL}/cost-basis/${id}`,
-        updatedData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setCostBasis(costBasis.map((item) => (item.id === id ? response.data : item)));
-      setSuccess("Cost basis updated!");
-      setTimeout(() => setSuccess(""), 3000);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message);
-    }
-  };
-
-  // Fetch price history
-  const handleFetchHistory = async (symbol: string) => {
-    try {
-      setSelectedHistorySymbol(symbol);
-      const res = await axios.get<PriceHistoryItem[]>(`${API_URL}/prices/${symbol}`, {
+      await fetch(`${API_URL}/cost-basis/${id}`, {
+        method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
-      setPriceHistory(res.data);
+      setCostBasis(costBasis.filter((item) => item.id !== id));
+      setSuccess("Purchase removed!");
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.message || "Error removing purchase");
     }
+  };
+
+  const togglePurchaseHistory = async (symbol: string) => {
+    const newExpanded = new Set(expandedPurchaseHistory);
+    if (newExpanded.has(symbol)) {
+      newExpanded.delete(symbol);
+    } else {
+      newExpanded.add(symbol);
+      if (!history.has(symbol)) {
+        await fetchHistory(symbol);
+      }
+    }
+    setExpandedPurchaseHistory(newExpanded);
+  };
+
+  const toggleHistory = async (symbol: string) => {
+    const newExpanded = new Set(expandedHistory);
+    if (newExpanded.has(symbol)) {
+      newExpanded.delete(symbol);
+    } else {
+      newExpanded.add(symbol);
+      if (!history.has(symbol)) {
+        await fetchHistory(symbol);
+      }
+    }
+    setExpandedHistory(newExpanded);
+  };
+
+  const fetchHistory = async (symbol: string) => {
+    try {
+      const url = `${API_URL}/charts/history/${symbol}?symbol=${symbol}&days=30`;
+      console.log("Fetching history from:", url);
+
+      const response = await fetch(url);
+      console.log("Response status:", response.status);
+      console.log("Response headers:", response.headers);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("History data received:", data);
+
+      const historyData = data.history || [];
+      console.log("Parsed history items:", historyData.length);
+
+      setHistory(new Map(history).set(symbol, historyData));
+      console.log("History state updated for:", symbol);
+    } catch (err) {
+      console.error("History fetch failed:", err);
+      setError(`Failed to load history: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const fetchCandles = async (symbol: string) => {
+    try {
+      const url = `${API_URL}/charts/chart/${symbol}?days=30&interval=4h`;
+      console.log("Fetching candles from:", url);
+
+      const response = await fetch(url);
+      console.log("Response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Candle data received:", data);
+
+      const candleData = data.candles || [];
+      console.log("Parsed candle items:", candleData.length);
+
+      setCandles(new Map(candles).set(symbol, candleData));
+      console.log("Candles state updated for:", symbol);
+    } catch (err) {
+      console.error("Candle fetch failed:", err);
+      setError(`Failed to load chart: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const toggleChart = async (symbol: string) => {
+    const newExpanded = new Set(expandedCharts);
+    if (newExpanded.has(symbol)) {
+      newExpanded.delete(symbol);
+    } else {
+      newExpanded.add(symbol);
+      if (!candles.has(symbol)) {
+        await fetchCandles(symbol);
+      }
+    }
+    setExpandedCharts(newExpanded);
   };
 
   const handleLogout = () => {
     window.localStorage.removeItem("token");
-    navigate("/login");
+    window.location.href = "/login";
   };
 
+  const getCoinsAlerts = (symbol: string) =>
+    alerts.filter((a) => a.symbol.toUpperCase() === symbol.toUpperCase());
+
+  const getCoinCostBasis = (symbol: string) =>
+    costBasis.filter((c) => c.symbol.toUpperCase() === symbol.toUpperCase());
+
+  const combinedItems = watchlist.map((wl) => {
+    const costs = getCoinCostBasis(wl.symbol);
+    const currentPrice = prices.find((p) => p.symbol.toUpperCase() === wl.symbol.toUpperCase())?.price || 0;
+    return { watchlist: wl, costBasis: costs, currentPrice };
+  });
+
+  const filteredCoins = useMemo(() => {
+    return allCoins.filter((c) =>
+      c.symbol.toLowerCase().startsWith(searchCoin.toLowerCase()) ||
+      c.id.toLowerCase().startsWith(searchCoin.toLowerCase())
+    );
+  }, [searchCoin, allCoins]);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-black">
-      {/* Header */}
-      <header className="bg-slate-900/50 backdrop-blur-md border-b border-slate-700 sticky top-0 z-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-900 to-slate-950">
+      <header className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 backdrop-blur-md border-b border-blue-500/20 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-transparent bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text">
-            CryptoTracker Dashboard
+          <h1 className="text-4xl font-bold text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 bg-clip-text">
+            Crypto Tracker
           </h1>
           <button
             onClick={handleLogout}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
+            className="px-6 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/50 rounded-lg transition"
           >
             Logout
           </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Alerts */}
+      <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full px-4 pointer-events-none">
         {error && (
-          <div className="mb-6 p-4 bg-red-500/20 border border-red-500 text-red-200 rounded-lg">
-            {error}
+          <div className="mb-3 p-4 bg-red-500/20 border border-red-500/50 text-red-200 rounded-lg flex justify-between items-center pointer-events-auto">
+            <span>{error}</span>
+            <button onClick={() => setError("")} className="text-red-300">
+              <X size={20} />
+            </button>
           </div>
         )}
         {success && (
-          <div className="mb-6 p-4 bg-green-500/20 border border-green-500 text-green-200 rounded-lg">
-            {success}
+          <div className="mb-3 p-4 bg-green-500/20 border border-green-500/50 text-green-200 rounded-lg flex justify-between items-center pointer-events-auto">
+            <span>{success}</span>
+            <button onClick={() => setSuccess("")} className="text-green-300">
+              <X size={20} />
+            </button>
           </div>
         )}
+      </div>
 
-        {/* Action Buttons */}
-        <div className="mb-8 flex gap-4 flex-wrap">
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="mb-8 flex gap-3 flex-wrap">
           <button
             onClick={handleTriggerFetch}
             disabled={loading}
-            className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 text-white rounded-lg font-medium transition"
+            className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:opacity-50 text-white rounded-lg font-semibold transition shadow-lg"
           >
-            {loading ? "Updating..." : "Refresh All Data"}
-          </button>
-          <button
-            onClick={fetchAllData}
-            disabled={loading}
-            className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition"
-          >
-            Reload Data
+            {loading ? "Updating..." : "Refresh Prices"}
           </button>
         </div>
 
-        {/* Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Left Column */}
-          <div className="space-y-8">
-            {/* Add to Watchlist */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-white mb-4">Add to Watchlist</h2>
-              <form onSubmit={handleAddToWatchlist} className="space-y-4">
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Symbol (e.g., BTC)"
-                    value={newSymbol}
-                    onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
-                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    placeholder="Target Price (optional)"
-                    value={newTargetPrice || ""}
-                    onChange={(e) => setNewTargetPrice(e.target.value ? Number(e.target.value) : undefined)}
-                    step="0.01"
-                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
-                >
-                  Add to Watchlist
-                </button>
-              </form>
-            </div>
+        {/* TOP SECTION: Add to Watchlist + Add Purchase */}
+        <div className="grid grid-cols-2 gap-6 mb-8">
+          <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl z-50">
+            <h3 className="text-white font-bold mb-4">Add to Watchlist</h3>
+            <form onSubmit={handleAddToWatchlist} className="flex gap-2">
+              <div className="flex-1">
+                <SearchableDropdown
+                  options={allCoins}
+                  value={selectedCoin}
+                  onChange={setSelectedCoin}
+                  placeholder="Search coins..."
+                />
+              </div>
+              <button
+                type="submit"
+                className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-lg font-semibold transition flex-shrink-0"
+              >
+                <Plus size={18} />
+              </button>
+            </form>
+          </div>
 
-            {/* Watchlist */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-white mb-4">My Watchlist</h2>
-              {watchlist.length === 0 ? (
-                <p className="text-slate-400">No items in watchlist</p>
-              ) : (
-                <div className="space-y-3">
-                  {watchlist.map((item) => {
-                    const currentPrice = prices.find((p) => p.symbol === item.symbol)?.price;
-                    const priceStatus =
-                      item.target_price && currentPrice
-                        ? currentPrice >= item.target_price
-                          ? "✓ Target reached!"
-                          : `${((currentPrice / item.target_price - 1) * 100).toFixed(2)}% to target`
-                        : "";
+          <div className="bg-slate-800/40 border border-green-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+            <h3 className="text-white font-bold mb-4">Add Purchase</h3>
+            <form onSubmit={handleAddCostBasis} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Symbol"
+                value={newCostSymbol}
+                onChange={(e) => setNewCostSymbol(e.target.value.toUpperCase())}
+                className="w-20 px-3 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+              />
+              <input
+                type="number"
+                placeholder="Price"
+                value={newCostPrice || ""}
+                onChange={(e) => setNewCostPrice(e.target.value ? Number(e.target.value) : undefined)}
+                step="0.01"
+                className="flex-1 px-3 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+              />
+              <input
+                type="number"
+                placeholder="Qty"
+                value={newCostQuantity || ""}
+                onChange={(e) => setNewCostQuantity(e.target.value ? Number(e.target.value) : undefined)}
+                step="0.01"
+                className="w-20 px-3 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition flex-shrink-0"
+              >
+                <Plus size={18} />
+              </button>
+            </form>
+          </div>
+        </div>
 
-                    return (
-                      <div
-                        key={item.id}
-                        className="bg-slate-700/30 border border-slate-600 rounded p-3 flex justify-between items-center"
-                      >
-                        <div>
-                          <p className="font-semibold text-white">{item.symbol}</p>
-                          <p className="text-slate-400 text-sm">
-                            Current: ${currentPrice?.toFixed(2) || "N/A"}
-                          </p>
-                          {item.target_price && (
-                            <p className="text-slate-400 text-sm">
-                              Target: ${item.target_price.toFixed(2)} - {priceStatus}
-                            </p>
+        {/* WATCHLIST SECTION */}
+        <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl mb-8">
+          <h2 className="text-xl font-bold text-blue-200 mb-4">My Watchlist</h2>
+
+          {combinedItems.length === 0 ? (
+            <p className="text-slate-400 text-center py-8">No coins tracked</p>
+          ) : (
+            <div className="space-y-4 max-h-full overflow-y-auto pr-2">
+              {combinedItems.map(({ watchlist: wl, costBasis: costs, currentPrice }) => {
+                const coinsAlerts = getCoinsAlerts(wl.symbol);
+                const hasHistory = expandedHistory.has(wl.symbol);
+                const hasChart = expandedCharts.has(wl.symbol);
+                const hasPurchaseHistory = expandedPurchaseHistory.has(wl.symbol);
+
+                return (
+                  <div key={`watchlist-${wl.id}`} className="space-y-3">
+                    {/* COIN HEADER ROW */}
+                    <div className="bg-gradient-to-r from-slate-700/30 to-slate-700/10 border border-slate-600/30 rounded-lg p-4">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-shrink-0 min-w-[120px]">
+                          <p className="font-semibold text-white text-lg">{wl.symbol}</p>
+                          <p className="text-green-400 font-medium">Current: ${currentPrice.toFixed(2)}</p>
+                        </div>
+                        <div className="flex gap-3 float-right">
+                          <p className="text-sm font-semibold text-blue-300 ml-1 my-2">Purchase History</p>
+                          <div className="flex gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => togglePurchaseHistory(wl.symbol)}
+                              className="p-2 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded-lg transition"
+                              title="Purchase History"
+                            >
+                              <ChevronDown size={16} className={`${hasPurchaseHistory ? "rotate-180" : ""} transition`} />
+                            </button>
+                          </div>
+
+
+                          <div className="flex gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => toggleChart(wl.symbol)}
+                              className="p-2 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded-lg transition"
+                              title="Chart"
+                            >
+                              <BarChart3 size={16} />
+                            </button>
+                            <button
+                              onClick={() => toggleHistory(wl.symbol)}
+                              className="p-2 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 rounded-lg transition"
+                              title="Price history"
+                            >
+                              <ChevronDown size={16} className={`${hasHistory ? "rotate-180" : ""} transition`} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedCoin(wl.symbol);
+                                setShowAlertModal(true);
+                              }}
+                              className="p-2 bg-yellow-600/30 hover:bg-yellow-600/50 text-yellow-300 rounded-lg transition relative"
+                              title="Set price alert"
+                            >
+                              <Bell size={16} />
+                              {coinsAlerts.length > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-yellow-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                                  {coinsAlerts.length}
+                                </span>
+                              )}
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveFromWatchlist(wl.id)}
+                            className="p-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded-lg transition"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* CHART ROW (if expanded - collapses everything) */}
+                    {hasChart && candles.has(wl.symbol) && (
+                      <div className="bg-slate-700/20 border border-slate-600/20 rounded-lg p-4">
+                        <CandleChart candles={candles.get(wl.symbol)!} />
+                      </div>
+                    )}
+
+                    {/* HISTORY ROW (if expanded and chart not expanded) */}
+                    {hasHistory && (
+                      <div className="bg-slate-700/20 border border-slate-600/20 rounded-lg p-4">
+                        <p className="text-slate-300 text-sm font-semibold mb-3">Price History (Daily OHLC)</p>
+                        <div className="flex text-slate-400 border-b border-slate-700/30 pb-1">
+                          <span className="w-24 text-slate-300">Date</span>
+                          <span className="flex-1 text-center text-blue-400">Open</span>
+                          <span className="flex-1 text-center text-green-400">High</span>
+                          <span className="flex-1 text-center text-red-400">Low</span>
+                          <span className="flex-1 text-center text-purple-400">Close</span>
+                        </div>
+                        <div className="space-y-2 max-h-64 overflow-y-auto text-xs">
+                          {history.has(wl.symbol) && history.get(wl.symbol)!.length > 0 ? (
+                            history.get(wl.symbol)!.slice(0).reverse().map((item, idx) => (
+
+                              <div key={`history-${wl.symbol}-${idx}`} className="flex justify-between text-slate-400 border-b border-slate-700/30 pb-1">
+                                <span className="w-24 text-slate-300">{item.date}</span>
+                                <span className="flex-1 text-center text-blue-400">O: ${item.open.toFixed(2)}</span>
+                                <span className="flex-1 text-center text-green-400">H: ${item.high.toFixed(2)}</span>
+                                <span className="flex-1 text-center text-red-400">L: ${item.low.toFixed(2)}</span>
+                                <span className="flex-1 text-center text-purple-400">C: ${item.close.toFixed(2)}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-slate-400">Loading history...</p>
                           )}
                         </div>
-                        <button
-                          onClick={() => handleRemoveFromWatchlist(item.id)}
-                          className="px-3 py-1 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded transition"
-                        >
-                          Remove
-                        </button>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+                    )}
 
-          {/* Right Column */}
-          <div className="space-y-8">
-            {/* Latest Prices */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-white mb-4">Current Prices</h2>
-              {prices.length === 0 ? (
-                <p className="text-slate-400">No price data available</p>
-              ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {prices.map((coin) => (
-                    <div key={coin.symbol} className="bg-slate-700/30 rounded p-3 flex justify-between items-center">
-                      <div>
-                        <p className="font-semibold text-white">{coin.symbol}</p>
-                        <p className="text-green-400">${coin.price.toFixed(2)}</p>
+                    {/* PURCHASE HISTORY (always show if exists) */}
+
+                    {costs.length > 0 && (
+                      <div className="items-start gap-4">
+                        <div className="flex items-start gap-4">
+
+                        </div>
+                        {hasPurchaseHistory && (
+
+                          <div className="space-y-2">
+                            <p className="text-sm font-semibold text-blue-300 ml-1 my-2">Purchase History {wl.symbol}</p>
+                            {costs.map((cost) => {
+                              const totalInvestment = cost.cost_price * cost.quantity;
+                              const currentValue = currentPrice * cost.quantity;
+                              const gainLoss = currentValue - totalInvestment;
+                              const gainLossPercent = totalInvestment ? ((gainLoss / totalInvestment) * 100).toFixed(2) : "0";
+
+                              return (
+                                <div
+                                  key={`purchase-${cost.id}`}
+                                  className="bg-gradient-to-r from-slate-700/30 to-slate-700/10 border border-slate-600/30 rounded-lg p-3 flex items-center gap-4"
+                                >
+                                  {/* Cost Price */}
+                                  <div className="w-32 flex-shrink-0">
+                                    <p className="text-slate-400 text-xs">Cost Price</p>
+                                    <p className="text-white text-sm font-semibold">${cost.cost_price.toFixed(2)} </p>
+                                  </div>
+
+                                  {/* Qty */}
+                                  <div className="w-32 flex-shrink-0">
+                                    <p className="text-slate-400 text-xs">Qty</p>
+                                    <p className="text-white text-sm font-semibold">${cost.quantity}</p>
+                                  </div>
+
+                                  {/* Invested */}
+                                  <div className="flex-1 text-center">
+                                    <p className="text-slate-400 text-xs">Invested</p>
+                                    <p className="text-blue-400 text-sm font-semibold">${totalInvestment.toFixed(2)}</p>
+                                  </div>
+
+                                  {/* Current Value */}
+                                  <div className="flex-1 text-center">
+                                    <p className="text-slate-400 text-xs">Current Value</p>
+                                    <p className={`text-sm font-semibold ${currentValue >= totalInvestment ? "text-green-400" : "text-red-400"}`}>
+                                      ${currentValue.toFixed(2)}
+                                    </p>
+                                  </div>
+
+                                  {/* Return % */}
+                                  <div className="flex-1 text-center">
+                                    <p className="text-slate-400 text-xs">Return %</p>
+                                    <p className={`text-sm font-semibold ${gainLoss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                      {gainLoss >= 0 ? "+" : ""}{gainLossPercent}%
+                                    </p>
+                                  </div>
+
+                                  {/* P&L $ */}
+                                  <div className="flex-1 text-center">
+                                    <p className="text-slate-400 text-xs">P&L</p>
+                                    <p className={`text-sm font-semibold ${gainLoss >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                      ${gainLoss.toFixed(2)} {gainLoss >= 0 ? "⬆" : "⬇"}
+                                    </p>
+                                  </div>
+
+                                  {/* Delete Button */}
+                                  <button
+                                    onClick={() => handleDeleteCostBasis(cost.id)}
+                                    className="p-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded-lg transition flex-shrink-0"
+                                    title="Delete purchase"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                      <button
-                        onClick={() => handleFetchHistory(coin.symbol)}
-                        className="px-3 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded transition text-sm"
-                      >
-                        History
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Add Cost Basis */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-white mb-4">Track Purchase Cost</h2>
-              <form onSubmit={handleAddCostBasis} className="space-y-4">
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Symbol"
-                    value={newCostSymbol}
-                    onChange={(e) => setNewCostSymbol(e.target.value.toUpperCase())}
-                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    placeholder="Cost Price"
-                    value={newCostPrice || ""}
-                    onChange={(e) => setNewCostPrice(e.target.value ? Number(e.target.value) : undefined)}
-                    step="0.01"
-                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    placeholder="Quantity"
-                    value={newCostQuantity || ""}
-                    onChange={(e) => setNewCostQuantity(e.target.value ? Number(e.target.value) : undefined)}
-                    step="0.01"
-                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition"
-                >
-                  Add Purchase
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-
-        {/* Cost Basis List */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 mb-8">
-          <h2 className="text-2xl font-bold text-white mb-4">Purchase History</h2>
-          {costBasis.length === 0 ? (
-            <p className="text-slate-400">No purchase history yet</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-white">
-                <thead>
-                  <tr className="border-b border-slate-600">
-                    <th className="px-4 py-3 text-left">Symbol</th>
-                    <th className="px-4 py-3 text-left">Cost Price</th>
-                    <th className="px-4 py-3 text-left">Quantity</th>
-                    <th className="px-4 py-3 text-left">Total</th>
-                    <th className="px-4 py-3 text-left">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {costBasis.map((item) => (
-                    <tr key={item.id} className="border-b border-slate-700 hover:bg-slate-700/30">
-                      <td className="px-4 py-3">{item.symbol}</td>
-                      <td className="px-4 py-3">${item.cost_price.toFixed(2)}</td>
-                      <td className="px-4 py-3">{item.quantity}</td>
-                      <td className="px-4 py-3">${(item.cost_price * item.quantity).toFixed(2)}</td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => {
-                            const newPrice = prompt("Enter new cost price:", String(item.cost_price));
-                            if (newPrice) {
-                              handleUpdateCostBasis(item.id, { cost_price: Number(newPrice) });
-                            }
-                          }}
-                          className="px-2 py-1 bg-yellow-600/30 hover:bg-yellow-600/50 text-yellow-300 rounded transition text-sm"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Price History Modal */}
-        {selectedHistorySymbol && (
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-white">{selectedHistorySymbol} Price History</h2>
+        {/* MARKET SECTION */}
+        <div className="bg-slate-800/40 border border-purple-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+          <h2 className="text-2xl font-bold text-purple-200 mb-4">Market</h2>
+          {prices.length === 0 ? (
+            <p className="text-slate-400 text-center py-12">No price data</p>
+          ) : (
+            <div className="space-y-2">
+              <div className="mb-4 relative z-10" ref={marketSearchRef}>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search coins..."
+                    value={searchCoin}
+                    onChange={(e) => {
+                      setSearchCoin(e.target.value);
+                      setMarketSearchOpen(true);
+                    }}
+                    onFocus={() => setMarketSearchOpen(true)}
+                    className="w-full pl-10 pr-10 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-400/50 transition"
+                  />
+                  {searchCoin && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchCoin("")}
+                      className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
+                </div>
+
+                {marketSearchOpen && filteredCoins.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-2xl z-50 max-h-48 overflow-y-auto">
+                    {filteredCoins.slice(0, 20).map((coin) => {
+                      const price = prices.find((p) => p.symbol.toUpperCase() === coin.symbol.toUpperCase());
+                      return (
+                        <button
+                          key={`market-dropdown-${coin.id}`}
+                          type="button"
+                          onClick={() => {
+                            setSearchCoin(coin.symbol);
+                            setMarketSearchOpen(false);
+                          }}
+                          className="w-full px-4 py-2.5 hover:bg-slate-600 text-white text-left text-sm border-b border-slate-600 last:border-b-0 transition flex justify-between"
+                        >
+                          <span className="font-semibold">{coin.symbol.toUpperCase()}</span>
+                          <span className="text-green-400">${price?.price.toFixed(2) || "N/A"}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="max-h-96 overflow-y-auto space-y-2">
+                {filteredCoins.map((coin) => {
+                  const price = prices.find((p) => p.symbol.toUpperCase() === coin.symbol.toUpperCase());
+
+                  if (!price) return null;
+
+                  return (
+                    <div key={`market-${coin.id}`} className="bg-gradient-to-r from-slate-700/30 to-slate-700/10 border border-slate-600/30 rounded-lg p-3.5 hover:border-purple-400/30 transition">
+                      <div className="flex justify-between items-center">
+                        <div className="flex-1">
+                          <p className="font-semibold text-white">{coin.symbol.toUpperCase()}</p>
+                          <p className="text-green-400 text-sm font-medium">
+                            ${price.price.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {showAlertModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-yellow-500/30 rounded-xl p-8 max-w-md w-full shadow-2xl max-h-96 overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-yellow-200">Set Price Alert</h3>
               <button
                 onClick={() => {
-                  setSelectedHistorySymbol(null);
-                  setPriceHistory([]);
+                  setShowAlertModal(false);
+                  setAlertPrice(undefined);
                 }}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white transition"
               >
-                ✕
+                <X size={24} />
               </button>
             </div>
 
-            {priceHistory.length === 0 ? (
-              <p className="text-slate-400">No history data available</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-white">
-                  <thead>
-                    <tr className="border-b border-slate-600">
-                      <th className="px-4 py-3 text-left">Timestamp</th>
-                      <th className="px-4 py-3 text-left">Price</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {priceHistory.map((item, idx) => (
-                      <tr key={idx} className="border-b border-slate-700 hover:bg-slate-700/30">
-                        <td className="px-4 py-3">{new Date(item.timestamp).toLocaleString()}</td>
-                        <td className="px-4 py-3">${item.price.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <form onSubmit={handleCreateAlert} className="space-y-4 mb-6">
+              <div>
+                <label className="block text-slate-300 text-sm font-medium mb-2">Coin</label>
+                <p className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white text-sm">
+                  {selectedCoin.toUpperCase()}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 text-sm font-medium mb-2">
+                  Target Price ($)
+                </label>
+                <input
+                  type="number"
+                  placeholder="50000"
+                  value={alertPrice || ""}
+                  onChange={(e) =>
+                    setAlertPrice(e.target.value ? Number(e.target.value) : undefined)
+                  }
+                  step="0.01"
+                  className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-yellow-400/50 transition"
+                />
+              </div>
+
+              <p className="text-slate-400 text-sm">
+                Alert when {selectedCoin.toUpperCase()} reaches ${alertPrice || "your target price"}
+              </p>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAlertModal(false);
+                    setAlertPrice(undefined);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white rounded-lg font-medium transition"
+                >
+                  Create Alert
+                </button>
+              </div>
+            </form>
+
+            {selectedCoin && getCoinsAlerts(selectedCoin).length > 0 && (
+              <div className="border-t border-slate-600 pt-6">
+                <p className="text-yellow-200 text-sm font-semibold mb-3">Active Alerts</p>
+                <div className="space-y-2">
+                  {getCoinsAlerts(selectedCoin).map((alert) => (
+                    <div
+                      key={`alert-${alert.id}`}
+                      className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex justify-between items-center"
+                    >
+                      <div>
+                        <p className="text-yellow-300 font-semibold">${alert.target_price.toFixed(2)}</p>
+                        <p className="text-yellow-200/60 text-xs">
+                          {new Date(alert.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveAlert(alert.id)}
+                        className="p-1.5 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded transition"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
   );
 }

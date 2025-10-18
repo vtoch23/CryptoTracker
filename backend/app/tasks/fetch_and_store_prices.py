@@ -4,27 +4,24 @@ import httpx
 import datetime
 from celery import shared_task
 import logging
+from pycoingecko import CoinGeckoAPI
+
+cg = CoinGeckoAPI()
+
+coin_list = cg.get_coins_list()
+
 
 logger = logging.getLogger(__name__)
 
 COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price"
-SYMBOLS = {
-    "bitcoin": "BTC",
-    "ethereum": "ETH",
-    "solana": "SOL",
-    "render-token": "RENDER", 
-    "ondo-finance": "ONDO",   
-    "cardano": "ADA",         
-    "ripple": "XRP",        
-    "binancecoin": "BNB",
-    "aptos": "APT",
-    "optimism": "OP",
-    "injective-protocol": "INJ",
-    "near": "NEAR",       
-    "blockstack": "STX",
-    "cosmos": "ATOM",
-    "celestia": "TIA"
-}
+SYMBOLS = {}
+
+for coin in coin_list:
+    SYMBOLS[coin['id']] = coin['symbol']
+
+
+def get_available_coins():
+    return [{"id": coin_id, "symbol": symbol.upper()} for coin_id, symbol in SYMBOLS.items()]
 
 @shared_task(name="app.tasks.fetch_and_store_prices")
 def fetch_and_store_prices():
@@ -37,7 +34,7 @@ def fetch_and_store_prices():
 
         for name, symbol in SYMBOLS.items():
             if name in data and "usd" in data[name]:
-                price = float(data[name]["usd"])  # FIXED: Keep as float, not string
+                price = float(data[name]["usd"])
                 db.add(
                     PricePoint(
                         symbol=symbol.upper(),
@@ -57,3 +54,36 @@ def fetch_and_store_prices():
         raise
     finally:
         db.close()
+
+@shared_task(name="app.tasks.fetch_price_chart")
+def fetch_price_chart(symbol: str, days: str = "365"):
+    """Fetch price chart data from CoinGecko"""
+    try:
+        cg = CoinGeckoAPI()
+        # Find the coin ID from symbol
+        coin_id = None
+        for name, sym in SYMBOLS.items():
+            if sym.upper() == symbol.upper():
+                coin_id = name
+                break
+        
+        if not coin_id:
+            return {"status": "error", "message": f"Symbol {symbol} not found"}
+        
+        # Fetch market chart data
+        data = cg.get_coin_market_chart_by_id(
+            id=coin_id,
+            vs_currency="usd",
+            days=days
+        )
+        
+        return {
+            "status": "success",
+            "symbol": symbol,
+            "prices": data.get("prices", []),
+            "market_caps": data.get("market_caps", []),
+            "volumes": data.get("volumes", [])
+        }
+    except Exception as e:
+        logger.error(f"Error fetching chart for {symbol}: {e}")
+        return {"status": "error", "message": str(e)}

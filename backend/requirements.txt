@@ -37,6 +37,7 @@ pluggy==1.6.0
 prompt_toolkit==3.0.52
 psycopg2-binary==2.9.10
 pyasn1==0.6.1
+pycoingecko=3.2.0
 pycparser==2.23
 pydantic==2.11.9
 pydantic-extra-types==2.10.5
