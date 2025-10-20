@@ -5,22 +5,9 @@ from app import models, schemas, dependencies
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
-class AlertItemCreate(schemas.BaseModel):
-    symbol: str
-    target_price: float
-
-class AlertItemOut(schemas.BaseModel):
-    id: int
-    symbol: str
-    target_price: float
-    created_at: schemas.datetime
-
-    class Config:
-        from_attributes = True
-
-@router.post("/", response_model=AlertItemOut)
+@router.post("/", response_model=schemas.AlertItemOut)
 def create_alert(
-    item: AlertItemCreate, 
+    item: schemas.AlertItemCreate, 
     db: Session = Depends(dependencies.get_db), 
     user: models.User = Depends(dependencies.get_current_user)
 ):
@@ -29,8 +16,15 @@ def create_alert(
     if item.target_price < 0:
         raise HTTPException(status_code=400, detail="Target price cannot be negative")
     
+    # Validate symbol exists in Coin table
+    coin = db.query(models.Coin).filter(
+        models.Coin.symbol == item.symbol.upper()
+    ).first()
     
-    new_alert = models.WatchlistItem(
+    if not coin:
+        raise HTTPException(status_code=400, detail=f"Symbol {item.symbol.upper()} not found")
+    
+    new_alert = models.AlertsItem(
         user_id=user.id,
         symbol=item.symbol.upper(),
         target_price=item.target_price
@@ -40,15 +34,14 @@ def create_alert(
     db.refresh(new_alert)
     return new_alert
 
-@router.get("/", response_model=List[AlertItemOut])
+@router.get("/", response_model=List[schemas.AlertItemOut])
 def get_alerts(
     db: Session = Depends(dependencies.get_db), 
     user: models.User = Depends(dependencies.get_current_user)
 ):
-    """Get all price alerts for user"""
-    alerts = db.query(models.WatchlistItem).filter(
-        models.WatchlistItem.user_id == user.id,
-        models.WatchlistItem.target_price.isnot(None)
+    """Get all price alerts for current user"""
+    alerts = db.query(models.AlertsItem).filter(
+        models.AlertsItem.user_id == user.id
     ).all()
     
     if not alerts:
@@ -61,11 +54,10 @@ def delete_alert(
     db: Session = Depends(dependencies.get_db),
     user: models.User = Depends(dependencies.get_current_user)
 ):
-    """Delete an alert"""
-    alert = db.query(models.WatchlistItem).filter(
-        models.WatchlistItem.id == alert_id,
-        models.WatchlistItem.user_id == user.id,
-        models.WatchlistItem.target_price.isnot(None)
+    """Delete a specific price alert"""
+    alert = db.query(models.AlertsItem).filter(
+        models.AlertsItem.id == alert_id,
+        models.AlertsItem.user_id == user.id
     ).first()
     
     if not alert:

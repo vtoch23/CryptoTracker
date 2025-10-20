@@ -16,6 +16,14 @@ class WatchlistItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     symbol = Column(String, index=True)
+    coin_id = Column(String, unique=True, index=True)  # ✅ NEW
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class AlertsItem(Base):
+    __tablename__ = "alerts"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    symbol = Column(String, index=True)
     target_price = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -34,3 +42,9 @@ class CostBasis(Base):
     cost_price = Column(Float)
     quantity = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class Coin(Base):
+    __tablename__ = "coins"
+    id = Column(Integer, primary_key=True, index=True)
+    coin_id = Column(String, unique=True, index=True)
+    symbol = Column(String, unique=True, index=True)
