@@ -1,5 +1,5 @@
 from app.database import SessionLocal
-from app.models import WatchlistItem, PricePoint, User
+from app.models import AlertsItem, PricePoint, User
 from sqlalchemy import func
 from celery import shared_task
 import smtplib
@@ -14,22 +14,18 @@ logger = logging.getLogger(__name__)
 @shared_task(name="app.tasks.check_price_alerts")
 def check_price_alerts():
     """
-    Check all watchlist items and send notifications when target prices are met.
+    Check all price alerts and send notifications when target prices are met.
     """
     db = SessionLocal()
     try:
-        # Get all watchlist items with target prices
-        watchlist_items = (
-            db.query(WatchlistItem)
-            .filter(WatchlistItem.target_price.isnot(None))
-            .all()
-        )
+        # Get all alerts
+        alerts = db.query(AlertsItem).all()
 
-        if not watchlist_items:
-            logger.info("No watchlist items with target prices")
+        if not alerts:
+            logger.info("No price alerts")
             return {"status": "success", "alerts_sent": 0}
 
-        # Get latest prices - using the same reliable query as your endpoint
+        # Get latest prices
         subquery = (
             db.query(
                 PricePoint.symbol,
@@ -54,22 +50,22 @@ def check_price_alerts():
 
         alerts_sent = 0
         alerts_checked = 0
+        alerts_to_delete = []
         
-        for item in watchlist_items:
+        for alert in alerts:
             alerts_checked += 1
-            # Normalize symbol to uppercase for lookup
-            symbol_upper = item.symbol.upper()
+            symbol_upper = alert.symbol.upper()
             current_price = price_dict.get(symbol_upper)
             
             if current_price is None:
                 logger.warning(f"No price found for {symbol_upper}")
                 continue
 
-            target_price = item.target_price
+            target_price = alert.target_price
             
-            # Check if target price is met
-            if current_price == target_price:
-                user = db.query(User).filter(User.id == item.user_id).first()
+            # Check if target price is met or exceeded
+            if current_price >= target_price:
+                user = db.query(User).filter(User.id == alert.user_id).first()
                 
                 if user and user.is_active:
                     try:
@@ -82,16 +78,20 @@ def check_price_alerts():
                         )
                         
                         alerts_sent += 1
-                        logger.info(f"📧 Alert sent to {user.email} for {symbol_upper}: ${current_price:.2f} >= ${target_price:.2f}")
+                        logger.info(f"Alert sent to {user.email} for {symbol_upper}: ${current_price:.2f} >= ${target_price:.2f}")
                         
-                        # Remove from watchlist after alert
-                        # db.delete(item)
+                        # Mark for deletion
+                        alerts_to_delete.append(alert.id)
                         
                     except Exception as e:
                         logger.error(f"Failed to send alert to {user.email}: {e}")
 
+        # Delete triggered alerts
+        for alert_id in alerts_to_delete:
+            db.query(AlertsItem).filter(AlertsItem.id == alert_id).delete()
+        
         db.commit()
-        logger.info(f"Checked {alerts_checked} watchlist items, sent {alerts_sent} alerts")
+        logger.info(f"Checked {alerts_checked} alerts, sent {alerts_sent} notifications")
         return {"status": "success", "checked": alerts_checked, "alerts_sent": alerts_sent}
 
     except Exception as e:
@@ -120,7 +120,7 @@ def send_price_alert_email(user_email: str, symbol: str, current_price: float, t
               
               <!-- Header -->
               <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center;">
-                <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">🎯 Price Target Reached!</h1>
+                <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">Target Reached!</h1>
               </div>
               
               <!-- Main Content -->
@@ -144,17 +144,13 @@ def send_price_alert_email(user_email: str, symbol: str, current_price: float, t
                       <td style="padding: 12px 0; color: #64748b; font-size: 15px;">Current Price</td>
                       <td style="padding: 12px 0; text-align: right; font-weight: 600; color: #10b981; font-size: 16px;">${current_price:,.2f}</td>
                     </tr>
-                    <tr style="border-top: 1px solid #e2e8f0;">
-                      <td style="padding: 12px 0; color: #64748b; font-size: 15px;">Exceeded By</td>
-                      <td style="padding: 12px 0; text-align: right; font-weight: 600; color: #10b981; font-size: 16px;">+${price_change:.2f}</td>
-                    </tr>
                   </table>
                 </div>
                 
                 <!-- Call to Action -->
                 <div style="text-align: center; padding: 20px; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #10b981;">
                   <p style="margin: 0; color: #166534; font-size: 14px; line-height: 1.6;">
-                    <strong>💡 What's next?</strong><br>
+                    <strong>Action Needed:</strong><br>
                     Your {symbol} target has been reached. Consider reviewing your investment strategy.
                   </p>
                 </div>
@@ -172,7 +168,7 @@ def send_price_alert_email(user_email: str, symbol: str, current_price: float, t
         """
 
         text = f"""
-🎯 PRICE ALERT: {symbol}
+PRICE ALERT: {symbol}
 
 Your target price has been reached!
 
@@ -180,10 +176,7 @@ Current Price:    ${current_price:,.2f}
 Your Target:      ${target_price:,.2f}
 Exceeded By:      +${price_change:.2f} ({price_change_pct:+.2f}%)
 
-────────────────────────────────
-
 This is an automated alert from Crypto Price Tracker.
-This watchlist item has been removed after triggering this alert.
         """
 
         msg.attach(MIMEText(text, 'plain'))
@@ -197,7 +190,7 @@ This watchlist item has been removed after triggering this alert.
                 server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.send_message(msg)
             
-        logger.info(f"✉️  Email sent successfully to {user_email}")
+        logger.info(f"Email sent successfully to {user_email}")
 
     except Exception as e:
         logger.error(f"Failed to send email to {user_email}: {e}")
