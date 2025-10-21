@@ -42,19 +42,19 @@ celery_app.conf.beat_schedule = {
     # Fetch prices every 5 minutes
     'fetch-prices-every-5-minutes': {
         'task': 'app.tasks.fetch_and_store_prices',
-        'schedule': crontab(minute='*/5'),  # Every 5 minutes
+        'schedule': crontab(minute='*/10'),  # Every 5 minutes
     },
     
     # Check price alerts every 5 minutes
     'check-alerts-every-5-minutes': {
         'task': 'app.tasks.check_price_alerts',
-        'schedule': crontab(minute='*/5'),  # Every 5 minutes
+        'schedule': crontab(minute='*/10'),  # Every 5 minutes
     },
     
     # Update coins list once a week (Sunday at 3 AM)
     'update-coins-list-weekly': {
         'task': 'app.tasks.update_coins_list',
-        'schedule': crontab(hour=3, minute=0, day_of_week=0),  # Sunday 3 AM
+        'schedule': crontab(hour=3, minute=0, day_of_week=1),  # Sunday 3 AM
     },
     
     # Fetch trending coins every hour
@@ -66,7 +66,7 @@ celery_app.conf.beat_schedule = {
     # Fetch top gainers and losers every hour
     'fetch-gainers-losers-hourly': {
         'task': 'app.tasks.fetch_top_gainers_losers',
-        'schedule': crontab(minute=5),  # Every hour at minute 5
+        'schedule': crontab(minute=1),  # Every hour at minute 5
     },
 }
 

@@ -1,8 +1,15 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Trash2, Plus, Bell, ChevronDown, X, Search, BarChart3, LogOut, TrendingUp, TrendingDown } from "lucide-react";
-import { formatPrice } from '../utils/priceFormatters';
 
 const API_URL = "http://localhost:8000";
+
+const formatPrice = (price: number | undefined) => {
+  if (price === undefined || price === null) return "0.00";
+  if (price >= 1) return price.toFixed(2);
+  if (price >= 0.01) return price.toFixed(4);
+  if (price >= 0.0001) return price.toFixed(6);
+  return price.toFixed(8);
+};
 
 interface CoinPrice {
   symbol: string;
@@ -98,56 +105,6 @@ const TOP_100_COINS = [
   { symbol: "XLM", coin_id: "stellar" },
   { symbol: "HYPE", coin_id: "hyperliquid" },
   { symbol: "BCH", coin_id: "bitcoin-cash" },
-  { symbol: "SUI", coin_id: "sui" },
-  { symbol: "WETH", coin_id: "weth" },
-  { symbol: "AVAX", coin_id: "avalanche-2" },
-  { symbol: "USDS", coin_id: "usds" },
-  { symbol: "LEO", coin_id: "leo-token" },
-  { symbol: "CBBTC", coin_id: "coinbase-wrapped-btc" },
-  { symbol: "HBAR", coin_id: "hedera-hashgraph" },
-  { symbol: "LTC", coin_id: "litecoin" },
-  { symbol: "SHIB", coin_id: "shiba-inu" },
-  { symbol: "MNT", coin_id: "mantle" },
-  { symbol: "XMR", coin_id: "monero" },
-  { symbol: "TON", coin_id: "ton" },
-  { symbol: "CRO", coin_id: "crypto-com-chain" },
-  { symbol: "DOT", coin_id: "polkadot" },
-  { symbol: "DAI", coin_id: "dai" },
-  { symbol: "TAO", coin_id: "bittensor" },
-  { symbol: "ZEC", coin_id: "zcash" },
-  { symbol: "UNI", coin_id: "uniswap" },
-  { symbol: "OKB", coin_id: "okb" },
-  { symbol: "AAVE", coin_id: "aave" },
-  { symbol: "ENA", coin_id: "ethena" },
-  { symbol: "BGB", coin_id: "bitget-token" },
-  { symbol: "PEPE", coin_id: "pepe" },
-  { symbol: "NEAR", coin_id: "near" },
-  { symbol: "PYUSD", coin_id: "paypal-usd" },
-  { symbol: "JITOSOL", coin_id: "jito-staked-sol" },
-  { symbol: "ETC", coin_id: "ethereum-classic" },
-  { symbol: "APT", coin_id: "aptos" },
-  { symbol: "XAUT", coin_id: "tether-gold" },
-  { symbol: "POL", coin_id: "polygon" },
-  { symbol: "WLD", coin_id: "worldcoin" },
-  { symbol: "IP", coin_id: "story" },
-  { symbol: "RETH", coin_id: "rocket-pool-eth" },
-  { symbol: "KCS", coin_id: "kucoin-token" },
-  { symbol: "ARB", coin_id: "arbitrum" },
-  { symbol: "PI", coin_id: "pi" },
-  { symbol: "ICP", coin_id: "internet-computer" },
-  { symbol: "ALGO", coin_id: "algorand" },
-  { symbol: "ATOM", coin_id: "cosmos" },
-  { symbol: "VET", coin_id: "vechain" },
-  { symbol: "WBNB", coin_id: "wrapped-bnb" },
-  { symbol: "KAS", coin_id: "kaspa" },
-  { symbol: "PUMP", coin_id: "pump-fun" },
-  { symbol: "PENGU", coin_id: "pudgy-penguins" },
-  { symbol: "PAXG", coin_id: "pax-gold" },
-  { symbol: "RENDER", coin_id: "render-token" },
-  { symbol: "FLR", coin_id: "flare" },
-  { symbol: "LBTC", coin_id: "lombard-staked-btc" },
-  { symbol: "QNT", coin_id: "quant-network" },
-  { symbol: "SEI", coin_id: "sei" },
 ];
 
 const deduplicateHistoryByDate = (items: HistoryItem[]): HistoryItem[] => {
@@ -218,7 +175,7 @@ interface WatchlistDisplayProps {
   candles: Map<string, Candle[]>;
   history: Map<string, HistoryItem[]>;
   alerts: AlertItem[];
-  isFullPage?: boolean; // NEW: for conditional styling
+  isFullPage?: boolean;
   onToggleChart: (symbol: string, coinId: string) => void;
   onToggleHistory: (symbol: string, coinId: string) => void;
   onTogglePurchaseHistory: (symbol: string) => void;
@@ -264,8 +221,8 @@ function WatchlistDisplay(props: WatchlistDisplayProps) {
   }
 
   const containerClass = isFullPage 
-    ? "space-y-4 overflow-y-auto pr-2" 
-    : "space-y-4 max-h-full overflow-y-auto pr-2";
+    ? "space-y-4 pr-2" 
+    : "space-y-4 overflow-y-auto pr-2";
 
   return (
     <div className={containerClass}>
@@ -518,16 +475,15 @@ function MarketDisplay({
   };
 
   const containerClass = isFullPage 
-    ? "flex flex-col h-full" 
+    ? "flex flex-col" 
     : "flex flex-col h-full min-h-0";
 
   const contentClass = isFullPage
-    ? "flex-1 overflow-y-auto space-y-2"
+    ? "flex-1 space-y-2 overflow-y-auto"
     : "flex-1 overflow-y-auto space-y-2 min-h-0";
 
   return (
     <div className={containerClass}>
-      {/* Market Tabs */}
       <div className="flex gap-2 mb-4 border-b border-slate-600/30">
         <button
           onClick={() => setActiveMarketTab("top100")}
@@ -663,7 +619,7 @@ function MarketDisplay({
                           : "bg-blue-600/30 hover:bg-blue-600/50 text-blue-300"
                       }`}
                     >
-                      {isInWatchlist ? "✓ Added" : "Add"}
+                      {isInWatchlist ? "✓ In Watchlist" : "Add to Watchlist"}
                     </button>
                   </div>
                 </div>
@@ -852,7 +808,7 @@ function AlertsGrouped({
   }
 
   const containerClass = isFullPage
-    ? "space-y-6 overflow-y-auto"
+    ? "space-y-6"
     : "space-y-6";
 
   return (
@@ -958,10 +914,10 @@ function SearchableDropdown({
   }, []);
 
   return (
-    <div className="relative z-50" ref={containerRef}>
+    <div className="relative" ref={containerRef}>
       <div className="flex gap-2 items-center">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
+          <Search className="absolute left-3 top-2.5 text-slate-400 pointer-events-none z-10" size={18} />
           <input
             type="text"
             placeholder={placeholder}
@@ -971,25 +927,26 @@ function SearchableDropdown({
               setIsOpen(true);
             }}
             onFocus={() => setIsOpen(true)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400/50 transition"
+            className="w-full pl-10 pr-10 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400/50 transition"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSearch("");
+                onChange("");
+              }}
+              className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition z-10"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
-        {value && (
-          <button
-            type="button"
-            onClick={() => {
-              onChange("");
-              setSearch("");
-            }}
-            className="px-3 py-2.5 bg-slate-700/50 hover:bg-slate-600 text-white rounded-lg transition"
-          >
-            ✕
-          </button>
-        )}
       </div>
 
       {isOpen && filtered.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-2xl z-50 max-h-64 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-2xl max-h-64 overflow-y-auto z-[100]">
           {filtered.map((option, idx) => {
             const isExactSymbolMatch = option.symbol.toUpperCase() === search.toUpperCase();
             const isExactIdMatch = option.id.toLowerCase() === search.toLowerCase();
@@ -1024,7 +981,7 @@ function SearchableDropdown({
       )}
       
       {isOpen && search && filtered.length === 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-2xl z-50 p-4">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-2xl p-4 z-[100]">
           <p className="text-slate-400 text-sm">
             No coins found matching "{search}". Try searching by:
             <br />• Symbol (e.g., BTC, ETH)
@@ -1511,9 +1468,17 @@ export default function Dashboard() {
     setDraggedItem(null);
   };
 
+  const getCoinAlerts = (symbol: string) => {
+    if (!symbol) return [];
+    return alerts.filter((a) => a.symbol.toUpperCase() === symbol.toUpperCase());
+  };
+
+  const currentCoinAlerts = selectedCoin ? getCoinAlerts(selectedCoin) : [];
+  const currentCoinPrice = prices.find(p => p.symbol.toUpperCase() === selectedCoin.toUpperCase())?.price || 0;
+
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-blue-900 to-slate-950 flex flex-col">
-      <header className="fixed top-0 left-0 right-0 bg-gradient-to-r from-blue-950 to-purple-950 border-b border-blue-500/50 z-50 shadow-lg">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-900 to-slate-950">
+      <header className="sticky top-0 bg-gradient-to-r from-blue-950 to-purple-950 border-b border-blue-500/50 z-50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-4xl font-bold text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 bg-clip-text">
             Crypto Tracker
@@ -1602,13 +1567,15 @@ export default function Dashboard() {
         )}
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 mt-32 flex-1 overflow-y-auto">
+      <main className="max-w-7xl w-full mx-auto px-4 py-8 pb-12">
+
         {/* DASHBOARD TAB */}
         {activeTab === "dashboard" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-6">
+
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-6">
               {/* LEFT COLUMN - Add to Watchlist */}
-              <div className="col-span-2 bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl z-30">
+              <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
                 <h3 className="text-white font-bold mb-4">Add to Watchlist</h3>
                 <form
                   onSubmit={(e) => {
@@ -1635,15 +1602,15 @@ export default function Dashboard() {
               </div>
 
               {/* RIGHT COLUMN - Add Purchase */}
-              <div className="bg-slate-800/40 border border-green-500/20 rounded-xl p-4 backdrop-blur-sm shadow-xl">
-                <h3 className="text-white font-bold mb-3 text-sm">Add Purchase</h3>
-                <form onSubmit={handleAddCostBasis} className="flex gap-1 items-end">
+              <div className="bg-slate-800/40 border border-green-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+                <h3 className="text-white font-bold mb-4">Add Purchase</h3>
+                <form onSubmit={handleAddCostBasis} className="flex gap-2 items-end">
                   <input
                     type="text"
                     placeholder="Symbol"
                     value={newCostSymbol}
                     onChange={(e) => setNewCostSymbol(e.target.value.toUpperCase())}
-                    className="w-16 px-2 py-2 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-xs"
+                    className="w-20 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
                   />
                   <input
                     type="number"
@@ -1651,7 +1618,7 @@ export default function Dashboard() {
                     value={newCostPrice || ""}
                     onChange={(e) => setNewCostPrice(e.target.value ? Number(e.target.value) : undefined)}
                     step="0.01"
-                    className="flex-1 px-2 py-2 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-xs"
+                    className="flex-1 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
                   />
                   <input
                     type="number"
@@ -1659,13 +1626,13 @@ export default function Dashboard() {
                     value={newCostQuantity || ""}
                     onChange={(e) => setNewCostQuantity(e.target.value ? Number(e.target.value) : undefined)}
                     step="0.01"
-                    className="w-16 px-2 py-2 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-xs"
+                    className="w-20 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
                   />
                   <button
                     type="submit"
-                    className="px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded font-semibold transition flex-shrink-0"
+                    className="px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition flex-shrink-0"
                   >
-                    <Plus size={16} />
+                    <Plus size={18} />
                   </button>
                 </form>
               </div>
@@ -1673,7 +1640,7 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-3 gap-6">
               {/* LEFT COLUMN - My Watchlist (2 cols) */}
-              <div className="col-span-2 bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+              <div className="col-span-2 bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl ">
                 <h2 className="text-xl font-bold text-blue-200 mb-4">My Watchlist</h2>
                 <div className="pr-2">
                   <WatchlistDisplay
@@ -1723,9 +1690,10 @@ export default function Dashboard() {
 
         {/* WATCHLIST TAB */}
         {activeTab === "watchlist" && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="grid grid-cols-2 gap-6">
-              <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl z-30">
+              {/* LEFT COLUMN - Add to Watchlist */}
+              <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
                 <h3 className="text-white font-bold mb-4">Add to Watchlist</h3>
                 <form
                   onSubmit={(e) => {
@@ -1751,15 +1719,16 @@ export default function Dashboard() {
                 </form>
               </div>
 
-              <div className="bg-slate-800/40 border border-green-500/20 rounded-xl p-4 backdrop-blur-sm shadow-xl">
-                <h3 className="text-white font-bold mb-3 text-sm">Add Purchase</h3>
-                <form onSubmit={handleAddCostBasis} className="flex gap-1 items-end">
+              {/* RIGHT COLUMN - Add Purchase */}
+              <div className="bg-slate-800/40 border border-green-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+                <h3 className="text-white font-bold mb-4">Add Purchase</h3>
+                <form onSubmit={handleAddCostBasis} className="flex gap-2 items-end">
                   <input
                     type="text"
                     placeholder="Symbol"
                     value={newCostSymbol}
                     onChange={(e) => setNewCostSymbol(e.target.value.toUpperCase())}
-                    className="w-16 px-2 py-2 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-xs"
+                    className="w-20 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
                   />
                   <input
                     type="number"
@@ -1767,7 +1736,7 @@ export default function Dashboard() {
                     value={newCostPrice || ""}
                     onChange={(e) => setNewCostPrice(e.target.value ? Number(e.target.value) : undefined)}
                     step="0.01"
-                    className="flex-1 px-2 py-2 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-xs"
+                    className="flex-1 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
                   />
                   <input
                     type="number"
@@ -1775,69 +1744,73 @@ export default function Dashboard() {
                     value={newCostQuantity || ""}
                     onChange={(e) => setNewCostQuantity(e.target.value ? Number(e.target.value) : undefined)}
                     step="0.01"
-                    className="w-16 px-2 py-2 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-xs"
+                    className="w-20 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
                   />
                   <button
                     type="submit"
-                    className="px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded font-semibold transition flex-shrink-0"
+                    className="px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition flex-shrink-0"
                   >
-                    <Plus size={16} />
+                    <Plus size={18} />
                   </button>
                 </form>
               </div>
             </div>
 
-            <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl h-[calc(100vh-350px)]">
-              <h2 className="text-xl font-bold text-blue-200 mb-4">My Watchlist</h2>
-              <WatchlistDisplay
-                combinedItems={combinedItems}
-                draggedItem={draggedItem}
-                expandedCharts={expandedCharts}
-                expandedHistory={expandedHistory}
-                expandedPurchaseHistory={expandedPurchaseHistory}
-                candles={candles}
-                history={history}
-                alerts={alerts}
-                isFullPage={true}
-                onToggleChart={toggleChart}
-                onToggleHistory={toggleHistory}
-                onTogglePurchaseHistory={togglePurchaseHistory}
-                onRemoveFromWatchlist={handleRemoveFromWatchlist}
-                onRemoveAlert={handleRemoveAlert}
-                onDeleteCostBasis={handleDeleteCostBasis}
-                onSetAlert={(symbol) => {
-                  setSelectedCoin(symbol);
-                  setShowAlertModal(true);
-                }}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-              />
+            <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+              <h2 className="text-2xl font-bold text-blue-200 mb-6">My Watchlist</h2>
+              <div>
+                <WatchlistDisplay
+                  combinedItems={combinedItems}
+                  draggedItem={draggedItem}
+                  expandedCharts={expandedCharts}
+                  expandedHistory={expandedHistory}
+                  expandedPurchaseHistory={expandedPurchaseHistory}
+                  candles={candles}
+                  history={history}
+                  alerts={alerts}
+                  isFullPage={true}
+                  onToggleChart={toggleChart}
+                  onToggleHistory={toggleHistory}
+                  onTogglePurchaseHistory={togglePurchaseHistory}
+                  onRemoveFromWatchlist={handleRemoveFromWatchlist}
+                  onRemoveAlert={handleRemoveAlert}
+                  onDeleteCostBasis={handleDeleteCostBasis}
+                  onSetAlert={(symbol) => {
+                    setSelectedCoin(symbol);
+                    setShowAlertModal(true);
+                  }}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                />
+              </div>
             </div>
           </div>
         )}
 
         {/* MARKETS TAB */}
         {activeTab === "markets" && (
-          <div className="bg-slate-800/40 border border-purple-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl h-[calc(100vh-250px)]">
-            <h2 className="text-2xl font-bold text-purple-200 mb-4">Cryptocurrency Markets</h2>
-            <MarketDisplay
-              searchCoin={searchCoin}
-              onSearchChange={setSearchCoin}
-              watchlist={watchlist}
-              onAddToWatchlist={handleAddToWatchlist}
-              marketPrices={marketPrices}
-              isFullPage={true}
-            />
+          <div className="bg-slate-800/40 border border-purple-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+            <h2 className="text-2xl font-bold text-purple-200 mb-6">Cryptocurrency Markets</h2>
+            <div>
+              <MarketDisplay
+                searchCoin={searchCoin}
+                onSearchChange={setSearchCoin}
+                watchlist={watchlist}
+                onAddToWatchlist={handleAddToWatchlist}
+                marketPrices={marketPrices}
+                isFullPage={true}
+              />
+            </div>
           </div>
         )}
 
         {/* ALERT MODAL */}
         {showAlertModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-800 border border-yellow-500/30 rounded-xl p-8 max-w-md w-full shadow-2xl max-h-96 overflow-y-auto">
+            <div className="bg-slate-800 border border-yellow-500/30 rounded-xl p-8 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-yellow-200">Set Price Alert</h3>
+                <h3 className="text-2xl font-bold text-yellow-200">Price Alerts for {selectedCoin.toUpperCase()}</h3>
                 <button
                   onClick={() => {
                     setShowAlertModal(false);
@@ -1849,14 +1822,37 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateAlert} className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-slate-300 text-sm font-medium mb-2">Coin</label>
-                  <p className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white text-sm">
-                    {selectedCoin.toUpperCase()}
-                  </p>
+              {/* Existing Alerts Section */}
+              {currentCoinAlerts.length > 0 && (
+                <div className="mb-6 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                  <h4 className="text-yellow-200 font-semibold mb-3">Existing Alerts</h4>
+                  <p className="text-yellow-200/60 text-sm mb-3">Current Price: ${formatPrice(currentCoinPrice)}</p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {currentCoinAlerts.map((alert) => {
+                      const status = currentCoinPrice >= alert.target_price ? "TRIGGERED" : "PENDING";
+                      return (
+                        <div key={`alert-${alert.id}`} className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3 flex justify-between items-center">
+                          <div>
+                            <p className="text-yellow-300 font-semibold">Target: ${formatPrice(alert.target_price)}</p>
+                            <p className="text-yellow-200/60 text-xs">{status} • {new Date(alert.created_at).toLocaleDateString()}</p>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveAlert(alert.id)}
+                            className="p-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded-lg transition"
+                            title="Remove alert"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
 
+              {/* Create New Alert Form */}
+              <form onSubmit={handleCreateAlert} className="space-y-4">
+                <h4 className="text-yellow-200 font-semibold">Create New Alert</h4>
                 <div>
                   <label className="block text-slate-300 text-sm font-medium mb-2">
                     Target Price ($)
@@ -1902,14 +1898,16 @@ export default function Dashboard() {
 
         {/* ALERTS TAB */}
         {activeTab === "alerts" && (
-          <div className="bg-slate-800/40 border border-yellow-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl h-[calc(100vh-250px)]">
-            <h2 className="text-xl font-bold text-yellow-200 mb-4">Price Alerts</h2>
-            <AlertsGrouped 
-              alerts={alerts} 
-              prices={prices} 
-              onRemoveAlert={handleRemoveAlert}
-              isFullPage={true}
-            />
+          <div className="bg-slate-800/40 border border-yellow-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+            <h2 className="text-2xl font-bold text-yellow-200 mb-6">Price Alerts</h2>
+            <div>
+              <AlertsGrouped 
+                alerts={alerts} 
+                prices={prices} 
+                onRemoveAlert={handleRemoveAlert}
+                isFullPage={true}
+              />
+            </div>
           </div>
         )}
       </main>
