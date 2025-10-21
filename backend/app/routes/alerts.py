@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app import models, schemas, dependencies
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -11,27 +14,41 @@ def create_alert(
     db: Session = Depends(dependencies.get_db), 
     user: models.User = Depends(dependencies.get_current_user)
 ):
-    """Create a price alert for a coin - MULTIPLE ALERTS PER COIN ALLOWED"""
+    """Create a price alert for a coin using symbol"""
     
     if item.target_price < 0:
         raise HTTPException(status_code=400, detail="Target price cannot be negative")
     
-    # Validate symbol exists in Coin table
+    symbol_upper = item.symbol.upper()
+    logger.info(f"Creating alert for {symbol_upper} at ${item.target_price} for user {user.id}")
+    
+    # Strategy 1: Look up by exact symbol match
     coin = db.query(models.Coin).filter(
-        models.Coin.symbol == item.symbol.upper()
+        models.Coin.symbol == symbol_upper
     ).first()
     
+    # Strategy 2: Case-insensitive match
     if not coin:
-        raise HTTPException(status_code=400, detail=f"Symbol {item.symbol.upper()} not found")
+        coin = db.query(models.Coin).filter(
+            models.Coin.symbol.ilike(symbol_upper)
+        ).first()
     
+    if not coin:
+        logger.warning(f"Coin not found for symbol: {symbol_upper}")
+        raise HTTPException(status_code=400, detail=f"Symbol {symbol_upper} not found. Please add it to your watchlist first.")
+    
+    logger.info(f"Found coin: {coin.symbol} ({coin.coin_id})")
+    
+    # Create alert using the symbol
     new_alert = models.AlertsItem(
         user_id=user.id,
-        symbol=item.symbol.upper(),
+        symbol=coin.symbol,  # Use the actual symbol from database
         target_price=item.target_price
     )
     db.add(new_alert)
     db.commit()
     db.refresh(new_alert)
+    logger.info(f"Alert created successfully for {coin.symbol}")
     return new_alert
 
 @router.get("/", response_model=List[schemas.AlertItemOut])
@@ -63,6 +80,7 @@ def delete_alert(
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
     
+    logger.info(f"Deleting alert {alert_id} for user {user.id}")
     db.delete(alert)
     db.commit()
     return None

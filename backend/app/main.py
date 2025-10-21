@@ -12,8 +12,8 @@ from app.routes.prices import router as prices_router
 from app.routes.fetch import router as fetch_router
 from app.routes import cost_basis
 from app.routes import charts
+from app.routes import market  
 
-# ===== SETUP LOGGING =====
 LOG_DIR = "logs"
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
@@ -50,7 +50,6 @@ logger.info("=" * 100)
 logger.info(f"Application started - Logs will be written to: {log_filename}")
 logger.info("=" * 100)
 
-# ===== FASTAPI APP =====
 app = FastAPI(title="CryptoTracker API", debug=True)
 
 from app.database import engine
@@ -74,6 +73,7 @@ app.include_router(prices_router)
 app.include_router(fetch_router)
 app.include_router(cost_basis.router)
 app.include_router(charts.router)
+app.include_router(market.router) 
 
 logger.info("All routers included successfully")
 

@@ -1,46 +1,51 @@
-/**
- * Utility functions for consistent price formatting
- * File: src/utils/priceFormatter.ts
- */
+// utils/priceFormatters.ts
 
-/**
- * Format price to 5 decimal places
- * Handles edge cases like very small numbers and scientific notation
- */
-export const formatPrice = (price: number | string | undefined | null, decimals: number = 5): string => {
-  if (price === null || price === undefined || price === '') {
-    return '0.00000';
+export const formatPrice = (price: number | undefined): string => {
+  if (price === undefined || price === null) return "0.00";
+  
+  // Handle very small numbers (< 0.01) - show more decimals
+  if (price < 0.01 && price > 0) {
+    return price.toLocaleString('en-US', {
+      minimumFractionDigits: 6,
+      maximumFractionDigits: 6,
+    });
   }
-
-  let numPrice = typeof price === 'string' ? parseFloat(price) : price;
-
-  if (isNaN(numPrice)) {
-    return '0.00000';
+  
+  // Handle numbers 0.01 - 1 - show 4 decimals
+  if (price < 1) {
+    return price.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    });
   }
-
-  // Ensure we don't display as scientific notation
-  return numPrice.toFixed(decimals);
+  
+  // Handle numbers >= 1 - show 2-3 decimals, but trim trailing zeros
+  const formatted = price.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 3,
+  });
+  
+  // Remove trailing zeros after decimal point, but keep at least 2 decimal places
+  return formatted.replace(/\.?0+$/, (match) => {
+    // If we're removing all decimals, return with .00
+    if (match === '.000') return '.00';
+    return match;
+  });
 };
 
-/**
- * Format for display with commas for large numbers
- */
-export const formatPriceDisplay = (price: number | string | undefined | null): string => {
-  const formatted = formatPrice(price, 5);
-  const [whole, decimal] = formatted.split('.');
+// Alternative simplified version if you prefer
+export const formatPriceSimple = (price: number | undefined): string => {
+  if (price === undefined || price === null) return "0.00";
   
-  // Add commas to whole number part
-  const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  // Just limit decimal places smartly
+  let decimals = 2;
+  if (price < 0.01) decimals = 6;
+  else if (price < 1) decimals = 4;
+  else if (price < 10) decimals = 3;
   
-  return `${withCommas}.${decimal}`;
-};
-
-/**
- * Parse price for calculations
- */
-export const parsePrice = (price: number | string): number => {
-  if (typeof price === 'string') {
-    return parseFloat(price);
-  }
-  return price;
+  const rounded = Math.round(price * Math.pow(10, decimals)) / Math.pow(10, decimals);
+  return rounded.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: decimals,
+  });
 };
