@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Trash2, Plus, Bell, ChevronDown, X, Search, BarChart3, LogOut, TrendingUp, TrendingDown } from "lucide-react";
 import PortfolioDisplay from "./PortfolioDisplay";
 
+
 const API_URL = "http://localhost:8000";
 
 const formatPrice = (price: number | undefined) => {
@@ -1915,6 +1916,47 @@ export default function Dashboard() {
         {activeTab === "portfolio" && (
           <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
             <h2 className="text-white font-bold mb-4 text-lg">My Portfolio</h2>
+            <div className="bg-slate-800/40 border border-green-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+                <h3 className="text-white font-bold mb-4">Add Purchase</h3>
+                <form onSubmit={handleAddCostBasis} className="flex gap-2 items-end">
+                  <input
+                    type="text"
+                    placeholder="Symbol"
+                    value={newCostSymbol}
+                    onChange={(e) => setNewCostSymbol(e.target.value.toUpperCase())}
+                    className="w-20 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Price"
+                    value={newCostPrice ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewCostPrice(val === "" ? undefined : parseFloat(val));
+                    }}
+                    step="0.01"
+                    className="flex-1 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Qty"
+                    value={newCostQuantity ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewCostQuantity(val === "" ? undefined : parseFloat(val));
+                    }}
+                    min="0.00000001"
+                    step="0.00000001"
+                    className="w-20 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg font-semibold transition flex-shrink-0"
+                  >
+                    <Plus size={18} />
+                  </button>
+                </form>
+              </div>
             <div className="bg-slate-700/20 border border-slate-600/20 rounded-lg p-4">
               <PortfolioDisplay
                 costBasis={costBasis}
@@ -2068,32 +2110,7 @@ export default function Dashboard() {
               </div>
 
               {/* Existing Alerts Section */}
-              {currentCoinAlerts.length > 0 && (
-                <div className="mb-6 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-                  <h4 className="text-yellow-200 font-semibold mb-3">Existing Alerts</h4>
-                  <p className="text-yellow-200/60 text-sm mb-3">Current Price: ${formatPrice(currentCoinPrice)}</p>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {currentCoinAlerts.map((alert) => {
-                      const status = currentCoinPrice >= alert.target_price ? "TRIGGERED" : "PENDING";
-                      return (
-                        <div key={`alert-${alert.id}`} className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3 flex justify-between items-center">
-                          <div>
-                            <p className="text-yellow-300 font-semibold">Target: ${formatPrice(alert.target_price)}</p>
-                            <p className="text-yellow-200/60 text-xs">{status} • {new Date(alert.created_at).toLocaleDateString()}</p>
-                          </div>
-                          <button
-                            onClick={() => handleRemoveAlert(alert.id)}
-                            className="p-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded-lg transition"
-                            title="Remove alert"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              
 
               {/* Create New Alert Form */}
               <form onSubmit={handleCreateAlert} className="space-y-4">
@@ -2137,6 +2154,43 @@ export default function Dashboard() {
                   </button>
                 </div>
               </form>
+              {currentCoinAlerts.length > 0 && (
+                <div className="mt-6 border-t border-slate-600/40 pt-4">
+                  <h4 className="text-yellow-200 font-semibold mb-3">Existing Alerts</h4>
+                  <p className="text-slate-400 text-sm mb-3">
+                    Current Price: ${formatPrice(currentCoinPrice)}
+                  </p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {currentCoinAlerts.map((alert) => {
+                      const status =
+                        currentCoinPrice >= alert.target_price ? "TRIGGERED" : "PENDING";
+                      return (
+                        <div
+                          key={`alert-${alert.id}`}
+                          className="bg-slate-700/30 border border-slate-600/40 rounded-lg p-3 flex justify-between items-center"
+                        >
+                          <div>
+                            <p className="text-slate-200 font-semibold">
+                              Target: ${formatPrice(alert.target_price)}
+                            </p>
+                            <p className="text-slate-400 text-xs">
+                              {status} • {new Date(alert.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveAlert(alert.id)}
+                            className="p-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded-lg transition"
+                            title="Remove alert"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         )}
