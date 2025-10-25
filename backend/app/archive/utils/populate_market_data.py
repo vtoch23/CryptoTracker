@@ -12,7 +12,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.database import SessionLocal, engine
-from app.models import Base, TrendingCoin, TopGainerLoser
+from app.models import Base, TrendingCoin, TopGainerLoser, Top100
 from pycoingecko import CoinGeckoAPI
 import logging
 from datetime import datetime
@@ -234,6 +234,94 @@ def verify_data():
     finally:
         db.close()
 
+def populate_top_100():
+    coins = [
+        ("bitcoin", "btc"),
+        ("ethereum", "eth"),
+        ("tether", "usdt"),
+        ("binancecoin", "bnb"),
+        ("ripple", "xrp"),
+        ("solana", "sol"),
+        ("usd-coin", "usdc"),
+        ("lido-staked-ether", "steth"),
+        ("tron", "trx"),
+        ("dogecoin", "doge"),
+        ("cardano", "ada"),
+        ("wrapped-steth", "wsteth"),
+        ("wrapped-bitcoin", "wbtc"),
+        ("wrapped-beacon-eth", "wbeth"),
+        ("figure-heloc", "figr_heloc"),
+        ("chainlink", "link"),
+        ("ethena-usde", "usde"),
+        ("wrapped-eeth", "weeth"),
+        ("stellar", "xlm"),
+        ("hyperliquid", "hype"),
+        ("bitcoin-cash", "bch"),
+        ("sui", "sui"),
+        ("usds", "usds"),
+        ("binance-bridged-usdt-bnb-smart-chain", "bsc-usd"),
+        ("avalanche-2", "avax"),
+        ("weth", "weth"),
+        ("leo-token", "leo"),
+        ("coinbase-wrapped-btc", "cbbtc"),
+        ("hedera-hashgraph", "hbar"),
+        ("litecoin", "ltc"),
+        ("shiba-inu", "shib"),
+        ("whitebit", "wbt"),
+        ("monero", "xmr"),
+        ("mantle", "mnt"),
+        ("toncoin", "ton"),
+        ("cronos", "cro"),
+        ("ethena-staked-usde", "susde"),
+        ("polkadot", "dot"),
+        ("dai", "dai"),
+        ("zcash", "zec"),
+        ("uniswap", "uni"),
+        ("bittensor", "tao"),
+        ("world-liberty-financial", "wlfi"),
+        ("memecore", "m"),
+        ("aave", "aave"),
+        ("susds", "susds"),
+        ("okb", "okb"),
+        ("bitget-token", "bgb"),
+        ("ethena", "ena"),
+        ("pepe", "pepe"),
+        ("near", "near"),
+        ("blackrock-usd-institutional-digital-liquidity-fund", "buidl"),
+        ("jito-staked-sol", "jitosol"),
+        ("paypal-usd", "pyusd"),
+        ("ethereum-classic", "etc"),
+        ("ondo-finance", "ondo"),
+        ("aptos", "apt"),
+        ("algorand", "algo"),
+        ("cosmos", "atom"),
+        ("kaspa", "kas"),
+        ("aave", "aave"),
+        ("quant", "qnt"),
+        ("pax-gold", "paxg"),
+        ("flare", "flr"),
+        ("render-token", "render"),
+        ("kucoin-shares", "kcs"),
+        ("vechain", "vet"),
+        ("pudgy-penguins", "pengu"),
+        ("arbitrum", "arb"),
+        ("tether-gold", "xaut"),
+        ("worldcoin-wld", "wld"),
+        ("internet-computer", "icp"),
+        ("pumpdotfun", "pump"),
+        ("sky", "sky"),
+        ("lombard-staked-btc", "lbtc"),
+        ("renzo-restaked-eth", "ezeth"),
+        ("sei-network", "sei"),
+        ("official-trump", "trump"),
+    ]
+
+    db = SessionLocal()
+    for cid, sym in coins:
+        db.add(Top100(coin_id=cid, symbol=sym))
+    db.commit()
+    db.close()
+
 def main():
     """Main execution"""
     logger.info("="*60)
@@ -243,7 +331,7 @@ def main():
     try:
         # Create tables
         create_tables()
-        
+        populate_top_100()  
         # Populate trending
         trending_ok = populate_trending()
         

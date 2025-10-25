@@ -13,6 +13,7 @@ from app.routes.fetch import router as fetch_router
 from app.routes import cost_basis
 from app.routes import charts
 from app.routes import market  
+from app.init_db import initialize_database
 
 LOG_DIR = "logs"
 if not os.path.exists(LOG_DIR):
@@ -58,7 +59,7 @@ Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200", "http://localhost:3000", "http://localhost:5173"],
+    allow_origins=["http://localhost:4200", "http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -77,9 +78,14 @@ app.include_router(market.router)
 
 logger.info("All routers included successfully")
 
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("FastAPI startup event triggered")
+    initialize_database()
+
+
+
 
 @app.on_event("shutdown")
 async def shutdown_event():

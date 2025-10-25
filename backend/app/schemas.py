@@ -73,3 +73,11 @@ class CostBasisOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class Top100Out(BaseModel):
+    id: int
+    coin_id: str
+    symbol: str
+
+    class Config:
+        from_attributes = True

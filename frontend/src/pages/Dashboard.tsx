@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Trash2, Plus, Bell, ChevronDown, X, Search, BarChart3, LogOut, TrendingUp, TrendingDown } from "lucide-react";
+import PortfolioDisplay from "./PortfolioDisplay";
 
 const API_URL = "http://localhost:8000";
 
@@ -81,7 +82,7 @@ interface TopGainerLoser {
   current_price: number;
 }
 
-type TabType = "dashboard" | "watchlist" | "markets" | "alerts";
+type TabType = "dashboard" | "watchlist" | "markets" | "alerts" | "portfolio";
 type MarketTabType = "top100" | "trending" | "gainers_losers";
 
 const TOP_100_COINS = [
@@ -112,22 +113,27 @@ const deduplicateHistoryByDate = (items: HistoryItem[]): HistoryItem[] => {
   items.forEach(item => {
     dateMap.set(item.date, item);
   });
-  return Array.from(dateMap.values()).sort((a, b) => 
+  return Array.from(dateMap.values()).sort((a, b) =>
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 };
 
+// 🔥 FIXED CandleChart
 const CandleChart = ({ candles }: { candles: Candle[] }) => {
-  if (!candles || candles.length === 0) return <div className="text-slate-400 text-sm">No data</div>;
+  if (!candles || candles.length === 0) {
+    return <div className="text-slate-400 text-sm">No data</div>;
+  }
 
   const highs = candles.map(c => c.high);
   const lows = candles.map(c => c.low);
   const maxPrice = Math.max(...highs);
   const minPrice = Math.min(...lows);
+
+  // Ensure visible range (avoid flattening)
   const range = maxPrice - minPrice || 1;
 
   return (
-    <div className="h-56 flex items-end gap-1 bg-slate-900/30 rounded p-4">
+    <div className="h-64 flex items-end gap-[2px] bg-slate-900/30 rounded p-4 overflow-hidden">
       {candles.slice(-80).map((candle, idx) => {
         const openNorm = (candle.open - minPrice) / range;
         const closeNorm = (candle.close - minPrice) / range;
@@ -165,6 +171,8 @@ const CandleChart = ({ candles }: { candles: Candle[] }) => {
   );
 };
 
+
+
 // WATCHLIST COMPONENT
 interface WatchlistDisplayProps {
   combinedItems: any[];
@@ -176,6 +184,7 @@ interface WatchlistDisplayProps {
   history: Map<string, HistoryItem[]>;
   alerts: AlertItem[];
   isFullPage?: boolean;
+  loadingStates: Map<string, 'chart' | 'history' | null>; // NEW: Track loading per coin
   onToggleChart: (symbol: string, coinId: string) => void;
   onToggleHistory: (symbol: string, coinId: string) => void;
   onTogglePurchaseHistory: (symbol: string) => void;
@@ -199,6 +208,7 @@ function WatchlistDisplay(props: WatchlistDisplayProps) {
     history,
     alerts,
     isFullPage = false,
+    loadingStates, // NEW
     onToggleChart,
     onToggleHistory,
     onTogglePurchaseHistory,
@@ -210,7 +220,7 @@ function WatchlistDisplay(props: WatchlistDisplayProps) {
     onDragOver,
     onDrop,
   } = props;
-  
+
   const getCoinsAlerts = (symbol: string) => {
     if (!symbol) return [];
     return alerts.filter((a) => a.symbol.toUpperCase() === symbol.toUpperCase());
@@ -220,8 +230,8 @@ function WatchlistDisplay(props: WatchlistDisplayProps) {
     return <p className="text-slate-400 text-center py-8">No coins tracked</p>;
   }
 
-  const containerClass = isFullPage 
-    ? "space-y-4 pr-2" 
+  const containerClass = isFullPage
+    ? "space-y-4 pr-2"
     : "space-y-4 overflow-y-auto pr-2";
 
   return (
@@ -232,6 +242,9 @@ function WatchlistDisplay(props: WatchlistDisplayProps) {
         const hasChart = expandedCharts.has(wl.symbol);
         const hasPurchaseHistory = expandedPurchaseHistory.has(wl.symbol);
         const isDragging = draggedItem === wl.id;
+        // ⚡ NEW: Check loading state for this coin
+        const isLoadingChart = loadingStates.get(wl.symbol) === 'chart';
+        const isLoadingHistory = loadingStates.get(wl.symbol) === 'history';
 
         return (
           <div
@@ -268,17 +281,27 @@ function WatchlistDisplay(props: WatchlistDisplayProps) {
                   <div className="flex gap-2 flex-shrink-0">
                     <button
                       onClick={() => onToggleChart(wl.symbol, wl.coin_id)}
-                      className="p-2 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded-lg transition"
-                      title="Chart"
+                      disabled={isLoadingChart}
+                      className={`p-2 ${isLoadingChart ? 'bg-blue-600/20 cursor-not-allowed' : 'bg-blue-600/30 hover:bg-blue-600/50'} text-blue-300 rounded-lg transition`}
+                      title={isLoadingChart ? "Loading chart..." : "Chart"}
                     >
-                      <BarChart3 size={16} />
+                      {isLoadingChart ? (
+                        <div className="animate-spin">⟳</div>
+                      ) : (
+                        <BarChart3 size={16} />
+                      )}
                     </button>
                     <button
                       onClick={() => onToggleHistory(wl.symbol, wl.coin_id)}
-                      className="p-2 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 rounded-lg transition"
-                      title="Price history"
+                      disabled={isLoadingHistory}
+                      className={`p-2 ${isLoadingHistory ? 'bg-purple-600/20 cursor-not-allowed' : 'bg-purple-600/30 hover:bg-purple-600/50'} text-purple-300 rounded-lg transition`}
+                      title={isLoadingHistory ? "Loading history..." : "Price history"}
                     >
-                      <ChevronDown size={16} className={`${hasHistory ? "rotate-180" : ""} transition`} />
+                      {isLoadingHistory ? (
+                        <div className="animate-spin">⟳</div>
+                      ) : (
+                        <ChevronDown size={16} className={`${hasHistory ? "rotate-180" : ""} transition`} />
+                      )}
                     </button>
                     <button
                       onClick={() => onSetAlert(wl.symbol)}
@@ -474,8 +497,8 @@ function MarketDisplay({
     }
   };
 
-  const containerClass = isFullPage 
-    ? "flex flex-col" 
+  const containerClass = isFullPage
+    ? "flex flex-col"
     : "flex flex-col h-full min-h-0";
 
   const contentClass = isFullPage
@@ -487,32 +510,29 @@ function MarketDisplay({
       <div className="flex gap-2 mb-4 border-b border-slate-600/30">
         <button
           onClick={() => setActiveMarketTab("top100")}
-          className={`px-4 py-2 font-semibold transition border-b-2 ${
-            activeMarketTab === "top100"
+          className={`px-4 py-2 font-semibold transition border-b-2 ${activeMarketTab === "top100"
               ? "text-purple-400 border-purple-400"
               : "text-slate-400 border-transparent hover:text-slate-300"
-          }`}
+            }`}
         >
           Top 100
         </button>
         <button
           onClick={() => setActiveMarketTab("trending")}
-          className={`px-4 py-2 font-semibold transition border-b-2 flex items-center gap-2 ${
-            activeMarketTab === "trending"
+          className={`px-4 py-2 font-semibold transition border-b-2 flex items-center gap-2 ${activeMarketTab === "trending"
               ? "text-purple-400 border-purple-400"
               : "text-slate-400 border-transparent hover:text-slate-300"
-          }`}
+            }`}
         >
           <TrendingUp size={16} />
           Trending
         </button>
         <button
           onClick={() => setActiveMarketTab("gainers_losers")}
-          className={`px-4 py-2 font-semibold transition border-b-2 flex items-center gap-2 ${
-            activeMarketTab === "gainers_losers"
+          className={`px-4 py-2 font-semibold transition border-b-2 flex items-center gap-2 ${activeMarketTab === "gainers_losers"
               ? "text-purple-400 border-purple-400"
               : "text-slate-400 border-transparent hover:text-slate-300"
-          }`}
+            }`}
         >
           <TrendingDown size={16} />
           Gainers & Losers
@@ -556,7 +576,7 @@ function MarketDisplay({
                   ).slice(0, 20).map((coin) => {
                     const isInWatchlist = watchlist.some(w => w.coin_id === coin.coin_id);
                     const price = marketPrices.get(coin.coin_id);
-                    
+
                     return (
                       <div
                         key={`search-${coin.coin_id}`}
@@ -574,11 +594,10 @@ function MarketDisplay({
                             }
                           }}
                           disabled={isInWatchlist}
-                          className={`px-3 py-1 rounded text-sm font-medium ${
-                            isInWatchlist
+                          className={`px-3 py-1 rounded text-sm font-medium ${isInWatchlist
                               ? "bg-green-600/20 text-green-300"
                               : "bg-blue-600/30 hover:bg-blue-600/50 text-blue-300"
-                          }`}
+                            }`}
                         >
                           {isInWatchlist ? "✓" : "+"}
                         </button>
@@ -613,11 +632,10 @@ function MarketDisplay({
                         }
                       }}
                       disabled={isInWatchlist}
-                      className={`px-2 py-1 rounded text-xs font-medium transition flex-shrink-0 ${
-                        isInWatchlist
+                      className={`px-2 py-1 rounded text-xs font-medium transition flex-shrink-0 ${isInWatchlist
                           ? "bg-green-600/20 text-green-300 cursor-default"
                           : "bg-blue-600/30 hover:bg-blue-600/50 text-blue-300"
-                      }`}
+                        }`}
                     >
                       {isInWatchlist ? "✓ In Watchlist" : "Add to Watchlist"}
                     </button>
@@ -634,7 +652,7 @@ function MarketDisplay({
           {trendingCoins.length > 0 ? (
             trendingCoins.map((coin, idx) => {
               const isInWatchlist = watchlist.some(w => w.coin_id === coin.id);
-              
+
               return (
                 <div key={`trending-${coin.id}-${idx}`} className="bg-gradient-to-r from-purple-700/20 to-purple-700/10 border border-purple-600/30 rounded-lg p-3 hover:border-purple-400/50 transition">
                   <div className="flex justify-between items-start">
@@ -653,11 +671,10 @@ function MarketDisplay({
                         }
                       }}
                       disabled={isInWatchlist}
-                      className={`px-2 py-1 rounded text-xs font-medium transition flex-shrink-0 ${
-                        isInWatchlist
+                      className={`px-2 py-1 rounded text-xs font-medium transition flex-shrink-0 ${isInWatchlist
                           ? "bg-green-600/20 text-green-300 cursor-default"
                           : "bg-purple-600/30 hover:bg-purple-600/50 text-purple-300"
-                      }`}
+                        }`}
                     >
                       {isInWatchlist ? "✓ Added" : "Add"}
                     </button>
@@ -682,7 +699,7 @@ function MarketDisplay({
               {topGainers.length > 0 ? (
                 topGainers.map((coin, idx) => {
                   const isInWatchlist = watchlist.some(w => w.coin_id === coin.id);
-                  
+
                   return (
                     <div key={`gainer-${coin.id}-${idx}`} className="bg-gradient-to-r from-green-700/20 to-green-700/10 border border-green-600/30 rounded-lg p-3 hover:border-green-400/50 transition">
                       <div className="flex justify-between items-start">
@@ -706,11 +723,10 @@ function MarketDisplay({
                             }
                           }}
                           disabled={isInWatchlist}
-                          className={`px-2 py-1 rounded text-xs font-medium transition flex-shrink-0 ${
-                            isInWatchlist
+                          className={`px-2 py-1 rounded text-xs font-medium transition flex-shrink-0 ${isInWatchlist
                               ? "bg-green-600/20 text-green-300 cursor-default"
                               : "bg-green-600/30 hover:bg-green-600/50 text-green-300"
-                          }`}
+                            }`}
                         >
                           {isInWatchlist ? "✓" : "+"}
                         </button>
@@ -733,7 +749,7 @@ function MarketDisplay({
               {topLosers.length > 0 ? (
                 topLosers.map((coin, idx) => {
                   const isInWatchlist = watchlist.some(w => w.coin_id === coin.id);
-                  
+
                   return (
                     <div key={`loser-${coin.id}-${idx}`} className="bg-gradient-to-r from-red-700/20 to-red-700/10 border border-red-600/30 rounded-lg p-3 hover:border-red-400/50 transition">
                       <div className="flex justify-between items-start">
@@ -757,11 +773,10 @@ function MarketDisplay({
                             }
                           }}
                           disabled={isInWatchlist}
-                          className={`px-2 py-1 rounded text-xs font-medium transition flex-shrink-0 ${
-                            isInWatchlist
+                          className={`px-2 py-1 rounded text-xs font-medium transition flex-shrink-0 ${isInWatchlist
                               ? "bg-green-600/20 text-green-300 cursor-default"
                               : "bg-red-600/30 hover:bg-red-600/50 text-red-300"
-                          }`}
+                            }`}
                         >
                           {isInWatchlist ? "✓" : "+"}
                         </button>
@@ -781,14 +796,14 @@ function MarketDisplay({
 }
 
 // ALERTS GROUPED COMPONENT
-function AlertsGrouped({ 
-  alerts, 
-  prices, 
+function AlertsGrouped({
+  alerts,
+  prices,
   onRemoveAlert,
-  isFullPage = false 
-}: { 
-  alerts: AlertItem[], 
-  prices: CoinPrice[], 
+  isFullPage = false
+}: {
+  alerts: AlertItem[],
+  prices: CoinPrice[],
   onRemoveAlert: (id: number) => void,
   isFullPage?: boolean
 }) {
@@ -815,7 +830,7 @@ function AlertsGrouped({
     <div className={containerClass}>
       {Object.entries(groupedAlerts).map(([symbol, coinAlerts]) => {
         const currentPrice = prices.find(p => p.symbol === symbol)?.price || 0;
-        
+
         return (
           <div key={`group-${symbol}`} className="border border-yellow-500/30 rounded-lg overflow-hidden">
             <div className="bg-yellow-500/10 px-4 py-3 border-b border-yellow-500/20">
@@ -865,40 +880,40 @@ function SearchableDropdown({
 
   const filtered = useMemo(() => {
     if (!search) return options.slice(0, 100);
-    
+
     const searchLower = search.toLowerCase();
     const searchUpper = search.toUpperCase();
     const seen = new Set<string>();
     const result: CoinOption[] = [];
-    
+
     options.forEach((opt) => {
       if (opt.symbol.toUpperCase() === searchUpper && !seen.has(opt.id)) {
         result.push(opt);
         seen.add(opt.id);
       }
     });
-    
+
     options.forEach((opt) => {
       if (opt.id.toLowerCase() === searchLower && !seen.has(opt.id)) {
         result.push(opt);
         seen.add(opt.id);
       }
     });
-    
+
     options.forEach((opt) => {
       if (opt.symbol.toLowerCase().startsWith(searchLower) && !seen.has(opt.id)) {
         result.push(opt);
         seen.add(opt.id);
       }
     });
-    
+
     options.forEach((opt) => {
       if (opt.id.toLowerCase().startsWith(searchLower) && !seen.has(opt.id)) {
         result.push(opt);
         seen.add(opt.id);
       }
     });
-    
+
     return result.slice(0, 20);
   }, [search, options]);
 
@@ -951,7 +966,7 @@ function SearchableDropdown({
             const isExactSymbolMatch = option.symbol.toUpperCase() === search.toUpperCase();
             const isExactIdMatch = option.id.toLowerCase() === search.toLowerCase();
             const isExactMatch = isExactSymbolMatch || isExactIdMatch;
-            
+
             return (
               <button
                 key={`${option.id}-${idx}`}
@@ -961,11 +976,10 @@ function SearchableDropdown({
                   setSearch(option.symbol);
                   setIsOpen(false);
                 }}
-                className={`w-full px-4 py-2.5 text-white text-left text-sm border-b border-slate-600 last:border-b-0 transition flex justify-between items-center ${
-                  isExactMatch 
-                    ? "bg-green-600/30 hover:bg-green-600/50" 
+                className={`w-full px-4 py-2.5 text-white text-left text-sm border-b border-slate-600 last:border-b-0 transition flex justify-between items-center ${isExactMatch
+                    ? "bg-green-600/30 hover:bg-green-600/50"
                     : "hover:bg-slate-600"
-                }`}
+                  }`}
               >
                 <div>
                   <span className={`font-semibold ${isExactMatch ? "text-green-300" : ""}`}>
@@ -979,7 +993,7 @@ function SearchableDropdown({
           })}
         </div>
       )}
-      
+
       {isOpen && search && filtered.length === 0 && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-2xl p-4 z-[100]">
           <p className="text-slate-400 text-sm">
@@ -1022,6 +1036,12 @@ export default function Dashboard() {
   const [expandedPurchaseHistory, setExpandedPurchaseHistory] = useState<Set<string>>(new Set());
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
 
+  // ⚡ OPTIMIZATION: Track loading states per coin to prevent duplicate requests
+  const [loadingStates, setLoadingStates] = useState<Map<string, 'chart' | 'history' | null>>(new Map());
+
+  // ⚡ OPTIMIZATION: AbortController refs for request cancellation
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+
   const fetchAllCoins = async () => {
     try {
       const response = await fetch(`${API_URL}/charts/available-coins`);
@@ -1034,10 +1054,8 @@ export default function Dashboard() {
 
   const fetchMarketPrices = async () => {
     try {
-      const coinIds = TOP_100_COINS.map(c => c.coin_id).join(',');
-      const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinIds}&vs_currencies=usd`);
+      const response = await fetch(`http://localhost:8000/market/prices`);
       const data = await response.json();
-      
       const priceMap = new Map<string, number>();
       Object.entries(data).forEach(([coinId, priceData]: [string, any]) => {
         priceMap.set(coinId, priceData.usd);
@@ -1053,7 +1071,7 @@ export default function Dashboard() {
       console.error("No token available");
       return;
     }
-    
+
     try {
       setLoading(true);
       setError("");
@@ -1061,12 +1079,12 @@ export default function Dashboard() {
       try {
         const pricesRes = await fetch(`${API_URL}/prices`, {
           method: 'GET',
-          headers: { 
+          headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
         });
-        
+
         if (!pricesRes.ok) {
           setPrices([]);
         } else {
@@ -1081,12 +1099,12 @@ export default function Dashboard() {
       try {
         const watchlistRes = await fetch(`${API_URL}/watchlist/`, {
           method: 'GET',
-          headers: { 
+          headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
         });
-        
+
         if (watchlistRes.status === 404) {
           setWatchlist([]);
         } else if (!watchlistRes.ok) {
@@ -1103,12 +1121,12 @@ export default function Dashboard() {
       try {
         const alertsRes = await fetch(`${API_URL}/alerts/`, {
           method: 'GET',
-          headers: { 
+          headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
         });
-        
+
         if (alertsRes.status === 404) {
           setAlerts([]);
         } else if (!alertsRes.ok) {
@@ -1125,12 +1143,12 @@ export default function Dashboard() {
       try {
         const costRes = await fetch(`${API_URL}/cost-basis/`, {
           method: 'GET',
-          headers: { 
+          headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
         });
-        
+
         if (costRes.status === 404) {
           setCostBasis([]);
         } else if (!costRes.ok) {
@@ -1160,11 +1178,53 @@ export default function Dashboard() {
     fetchMarketPrices();
   }, [token]);
 
+  // ⚡ OPTIMIZATION: Memory cleanup - remove data for collapsed items after 30 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Clean up history data for collapsed items to save memory
+      setHistory(prev => {
+        const newHistory = new Map(prev);
+        for (const [symbol] of newHistory) {
+          if (!expandedHistory.has(symbol)) {
+            newHistory.delete(symbol);
+          }
+        }
+        return newHistory;
+      });
+
+      // Clean up candles data for collapsed items
+      const watchlistSymbols = watchlist.map(w => w.symbol); // e.g., ["BTC","ETH",...]
+
+      setCandles(prev => {
+        const next = new Map(prev);
+        for (const key of Array.from(next.keys())) {
+          if (!watchlistSymbols.includes(key)) {
+            next.delete(key);
+          }
+        }
+        return next;
+      });
+    }, 30000); // Clean up after 30 seconds of being collapsed
+
+    return () => clearTimeout(timer);
+  }, [expandedHistory, expandedCharts]);
+
+  // ⚡ OPTIMIZATION: Cleanup on unmount - cancel all pending requests
+  useEffect(() => {
+    return () => {
+      // Cancel all pending requests when component unmounts
+      abortControllersRef.current.forEach(controller => {
+        controller.abort();
+      });
+      abortControllersRef.current.clear();
+    };
+  }, []);
+
   const handleTriggerFetch = async () => {
     try {
       setLoading(true);
       setError("");
-      
+
       const response = await fetch(`${API_URL}/fetch/fetch`, {
         method: 'POST',
         headers: {
@@ -1181,7 +1241,7 @@ export default function Dashboard() {
       await fetchAllData();
       setSuccess("✓ Prices updated!");
       setTimeout(() => setSuccess(""), 5000);
-      
+
     } catch (err: any) {
       const errorMessage = err.message || "Error refreshing prices";
       setError(`${errorMessage}`);
@@ -1334,80 +1394,228 @@ export default function Dashboard() {
     setExpandedPurchaseHistory(newExpanded);
   };
 
+  // ⚡ OPTIMIZED: Toggle history with proper request management
   const toggleHistory = async (symbol: string, coinId: string) => {
-    const newExpanded = new Set(expandedHistory);
-    if (newExpanded.has(symbol)) {
-      newExpanded.delete(symbol);
+    const isExpanded = expandedHistory.has(symbol);
+
+    if (isExpanded) {
+      // Collapse - cancel any pending request
+      const controller = abortControllersRef.current.get(`history-${symbol}`);
+      if (controller) {
+        controller.abort();
+        abortControllersRef.current.delete(`history-${symbol}`);
+      }
+
+      setExpandedHistory(prev => {
+        const next = new Set(prev);
+        next.delete(symbol);
+        return next;
+      });
+
+      setLoadingStates(prev => {
+        const next = new Map(prev);
+        next.delete(symbol);
+        return next;
+      });
     } else {
-      newExpanded.add(symbol);
-      if (!history.has(symbol)) {
+      // Expand
+      setExpandedHistory(prev => new Set(prev).add(symbol));
+
+      // Only fetch if we don't already have the data AND not currently loading
+      if (!history.has(symbol) && loadingStates.get(symbol) !== 'history') {
         await fetchHistory(symbol, coinId);
       }
     }
-    setExpandedHistory(newExpanded);
   };
 
   const fetchHistory = async (symbol: string, coinId: string) => {
+    // Cancel any existing request for this symbol
+    const existingController = abortControllersRef.current.get(`history-${symbol}`);
+    if (existingController) {
+      existingController.abort();
+    }
+
+    // Create new AbortController for this request
+    const controller = new AbortController();
+    abortControllersRef.current.set(`history-${symbol}`, controller);
+
+    // CRITICAL: Set timeout to prevent infinite hanging
+    const timeoutId = setTimeout(() => {
+      console.error(`Timeout: Request for ${symbol} took too long (>10s)`);
+      controller.abort();
+    }, 120000); // 30 second timeout
+
+    // Set loading state
+    setLoadingStates(prev => new Map(prev).set(symbol, 'history'));
+
     try {
-      const url = `${API_URL}/charts/history/${coinId}`;
-      const response = await fetch(url);
+      const url = `${API_URL}/charts/history/${coinId}?days=7`;
+      console.log(`⚡ Fetching history for ${symbol} (${coinId})...`);
+      console.log(`URL: ${url}`);
+
+      const response = await fetch(url, {
+        signal: controller.signal // Enable request cancellation
+      });
+
+      console.log(`Response status: ${response.status}`);
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
       const historyData = data.history || [];
-      
+
+      console.log(`✓ History fetched for ${symbol}:`, {
+        count: historyData.length,
+        cached: data.cached || false
+      });
+
       if (!historyData || historyData.length === 0) {
         setError(`No price history available for ${symbol}`);
         setTimeout(() => setError(""), 5000);
       } else {
-        setHistory(new Map(history).set(symbol, historyData));
+        setHistory(prev => new Map(prev).set(symbol, historyData));
       }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      setError(`Failed to load history: ${errorMsg}`);
-      setTimeout(() => setError(""), 5000);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log(`Request cancelled for ${symbol} (timeout or user action)`);
+        setError(`Request timeout - check if backend is running on ${API_URL}`);
+        setTimeout(() => setError(""), 5000);
+      } else {
+        console.error(`Error fetching history:`, err);
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        setError(`Failed to load history: ${errorMsg}`);
+        setTimeout(() => setError(""), 5000);
+      }
+    } finally {
+      // Clear timeout - CRITICAL!
+      clearTimeout(timeoutId);
+
+      // Clear loading state
+      setLoadingStates(prev => {
+        const next = new Map(prev);
+        next.delete(symbol);
+        return next;
+      });
+
+      // Clean up controller
+      abortControllersRef.current.delete(`history-${symbol}`);
+
+      console.log(`🧹 Cleanup complete for ${symbol}`);
     }
   };
 
   const fetchCandles = async (symbol: string, coinId: string) => {
+    // Cancel any existing request for this symbol
+    const existingController = abortControllersRef.current.get(`chart-${symbol}`);
+    if (existingController) {
+      existingController.abort();
+    }
+
+    // Create new AbortController for this request
+    const controller = new AbortController();
+    abortControllersRef.current.set(`chart-${symbol}`, controller);
+
+    // ⚡ CRITICAL: Set timeout to prevent infinite hanging
+    const timeoutId = setTimeout(() => {
+      console.error(`Timeout: Chart request for ${symbol} took too long (>10s)`);
+      controller.abort();
+    }, 30000); // 30 second timeout
+
+    // Set loading state
+    setLoadingStates(prev => new Map(prev).set(symbol, 'chart'));
+    console.log()
     try {
-      const url = `${API_URL}/charts/chart/${coinId}?days=30&interval=4h`;
-      const response = await fetch(url);
+      const url = `${API_URL}/charts/chart/${coinId}?days=7&interval=4h`;
+      console.log(`⚡ Fetching chart for ${symbol} (${coinId})...`);
+      console.log(`URL: ${url}`);
+
+      const response = await fetch(url, {
+        signal: controller.signal // Enable request cancellation
+      });
+
+      console.log(`Response status: ${response.status}`);
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
       const candleData = data.candles || [];
-      
+
+      console.log(`Chart fetched for ${symbol}:`, {
+        count: candleData.length,
+        cached: data.cached || false
+      });
+
       if (!candleData || candleData.length === 0) {
         setError(`No chart data available for ${symbol}`);
-        setTimeout(() => setError(""), 5000);
+        setTimeout(() => setError(""), 30000);
       } else {
-        setCandles(new Map(candles).set(symbol, candleData));
+        setCandles(prev => new Map(prev).set(symbol, candleData));
       }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      setError(`Failed to load chart: ${errorMsg}`);
-      setTimeout(() => setError(""), 5000);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log(`Chart request cancelled for ${symbol} (timeout or user action)`);
+        setError(`Request timeout - check if backend is running on ${API_URL}`);
+        setTimeout(() => setError(""), 30000);
+      } else {
+        console.error(`Error fetching chart:`, err);
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        setError(`Failed to load chart: ${errorMsg}`);
+        setTimeout(() => setError(""), 30000);
+      }
+    } finally {
+      // Clear timeout - CRITICAL!
+      clearTimeout(timeoutId);
+
+      // Clear loading state
+      setLoadingStates(prev => {
+        const next = new Map(prev);
+        next.delete(symbol);
+        return next;
+      });
+
+      // Clean up controller
+      abortControllersRef.current.delete(`chart-${symbol}`);
+
+      console.log(`🧹 Cleanup complete for ${symbol}`);
     }
   };
 
+  // ⚡ OPTIMIZED: Toggle chart with proper request management
   const toggleChart = async (symbol: string, coinId: string) => {
-    const newExpanded = new Set(expandedCharts);
-    if (newExpanded.has(symbol)) {
-      newExpanded.delete(symbol);
+    const isExpanded = expandedCharts.has(symbol);
+
+    if (isExpanded) {
+      // Collapse - cancel any pending request
+      const controller = abortControllersRef.current.get(`chart-${symbol}`);
+      if (controller) {
+        controller.abort();
+        abortControllersRef.current.delete(`chart-${symbol}`);
+      }
+
+      setExpandedCharts(prev => {
+        const next = new Set(prev);
+        next.delete(symbol);
+        return next;
+      });
+
+      setLoadingStates(prev => {
+        const next = new Map(prev);
+        next.delete(symbol);
+        return next;
+      });
     } else {
-      newExpanded.add(symbol);
-      if (!candles.has(symbol)) {
+      // Expand
+      setExpandedCharts(prev => new Set(prev).add(symbol));
+
+      // Only fetch if we don't already have the data AND not currently loading
+      if (!candles.has(symbol) && loadingStates.get(symbol) !== 'chart') {
         await fetchCandles(symbol, coinId);
       }
     }
-    setExpandedCharts(newExpanded);
   };
 
   const handleLogout = () => {
@@ -1425,11 +1633,11 @@ export default function Dashboard() {
 
   const combinedItems = watchlist.map((wl) => {
     if (!wl.symbol) return null;
-    
+
     const costs = getCoinCostBasis(wl.symbol);
     const pricesArray = Array.isArray(prices) ? prices : [];
     const currentPrice = pricesArray.find((p) => p.symbol.toUpperCase() === wl.symbol.toUpperCase())?.price || 0;
-    
+
     return { watchlist: wl, costBasis: costs, currentPrice };
   }).filter((item) => item !== null);
 
@@ -1463,7 +1671,7 @@ export default function Dashboard() {
     const draggedItemData = newWatchlist[draggedIndex];
     newWatchlist.splice(draggedIndex, 1);
     newWatchlist.splice(targetIndex, 0, draggedItemData);
-    
+
     setWatchlist(newWatchlist);
     setDraggedItem(null);
   };
@@ -1506,17 +1714,26 @@ export default function Dashboard() {
             <button
               onClick={() => setActiveTab("dashboard")}
               className={`px-6 py-3 font-semibold transition border-b-2 ${activeTab === "dashboard"
-                  ? "text-blue-400 border-blue-400"
-                  : "text-slate-400 border-transparent hover:text-slate-300"
+                ? "text-blue-400 border-blue-400"
+                : "text-slate-400 border-transparent hover:text-slate-300"
                 }`}
             >
               Dashboard
             </button>
             <button
-              onClick={() => setActiveTab("watchlist")}
-              className={`px-6 py-3 font-semibold transition border-b-2 ${activeTab === "watchlist"
+              onClick={() => setActiveTab("portfolio")}
+              className={`px-6 py-3 font-semibold transition border-b-2 ${activeTab === "portfolio"
                   ? "text-blue-400 border-blue-400"
                   : "text-slate-400 border-transparent hover:text-slate-300"
+                }`}
+            >
+              Portfolio
+            </button>
+            <button
+              onClick={() => setActiveTab("watchlist")}
+              className={`px-6 py-3 font-semibold transition border-b-2 ${activeTab === "watchlist"
+                ? "text-blue-400 border-blue-400"
+                : "text-slate-400 border-transparent hover:text-slate-300"
                 }`}
             >
               Watchlist
@@ -1524,8 +1741,8 @@ export default function Dashboard() {
             <button
               onClick={() => setActiveTab("markets")}
               className={`px-6 py-3 font-semibold transition border-b-2 ${activeTab === "markets"
-                  ? "text-blue-400 border-blue-400"
-                  : "text-slate-400 border-transparent hover:text-slate-300"
+                ? "text-blue-400 border-blue-400"
+                : "text-slate-400 border-transparent hover:text-slate-300"
                 }`}
             >
               Markets
@@ -1533,8 +1750,8 @@ export default function Dashboard() {
             <button
               onClick={() => setActiveTab("alerts")}
               className={`px-6 py-3 font-semibold transition border-b-2 relative ${activeTab === "alerts"
-                  ? "text-blue-400 border-blue-400"
-                  : "text-slate-400 border-transparent hover:text-slate-300"
+                ? "text-blue-400 border-blue-400"
+                : "text-slate-400 border-transparent hover:text-slate-300"
                 }`}
             >
               Alerts
@@ -1615,17 +1832,24 @@ export default function Dashboard() {
                   <input
                     type="number"
                     placeholder="Price"
-                    value={newCostPrice || ""}
-                    onChange={(e) => setNewCostPrice(e.target.value ? Number(e.target.value) : undefined)}
+                    value={newCostPrice ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewCostPrice(val === "" ? undefined : parseFloat(val));
+                    }}
                     step="0.01"
                     className="flex-1 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
                   />
                   <input
                     type="number"
                     placeholder="Qty"
-                    value={newCostQuantity || ""}
-                    onChange={(e) => setNewCostQuantity(e.target.value ? Number(e.target.value) : undefined)}
-                    step="0.01"
+                    value={newCostQuantity ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewCostQuantity(val === "" ? undefined : parseFloat(val));
+                    }}
+                    min="0.00000001"
+                    step="0.00000001"
                     className="w-20 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
                   />
                   <button
@@ -1653,6 +1877,7 @@ export default function Dashboard() {
                     history={history}
                     alerts={alerts}
                     isFullPage={false}
+                    loadingStates={loadingStates}
                     onToggleChart={toggleChart}
                     onToggleHistory={toggleHistory}
                     onTogglePurchaseHistory={togglePurchaseHistory}
@@ -1684,6 +1909,18 @@ export default function Dashboard() {
                   />
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+        {activeTab === "portfolio" && (
+          <div className="bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
+            <h2 className="text-white font-bold mb-4 text-lg">My Portfolio</h2>
+            <div className="bg-slate-700/20 border border-slate-600/20 rounded-lg p-4">
+              <PortfolioDisplay
+                costBasis={costBasis}
+                prices={prices}
+                onDeleteCostBasis={handleDeleteCostBasis}
+              />
             </div>
           </div>
         )}
@@ -1733,17 +1970,24 @@ export default function Dashboard() {
                   <input
                     type="number"
                     placeholder="Price"
-                    value={newCostPrice || ""}
-                    onChange={(e) => setNewCostPrice(e.target.value ? Number(e.target.value) : undefined)}
+                    value={newCostPrice ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewCostPrice(val === "" ? undefined : parseFloat(val));
+                    }}
                     step="0.01"
                     className="flex-1 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
                   />
                   <input
                     type="number"
                     placeholder="Qty"
-                    value={newCostQuantity || ""}
-                    onChange={(e) => setNewCostQuantity(e.target.value ? Number(e.target.value) : undefined)}
-                    step="0.01"
+                    value={newCostQuantity ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewCostQuantity(val === "" ? undefined : parseFloat(val));
+                    }}
+                    min="0.00000001"
+                    step="0.00000001"
                     className="w-20 px-2 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded text-white placeholder-slate-400 focus:outline-none focus:border-green-400/50 transition text-sm"
                   />
                   <button
@@ -1769,6 +2013,7 @@ export default function Dashboard() {
                   history={history}
                   alerts={alerts}
                   isFullPage={true}
+                  loadingStates={loadingStates}
                   onToggleChart={toggleChart}
                   onToggleHistory={toggleHistory}
                   onTogglePurchaseHistory={togglePurchaseHistory}
@@ -1901,9 +2146,9 @@ export default function Dashboard() {
           <div className="bg-slate-800/40 border border-yellow-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
             <h2 className="text-2xl font-bold text-yellow-200 mb-6">Price Alerts</h2>
             <div>
-              <AlertsGrouped 
-                alerts={alerts} 
-                prices={prices} 
+              <AlertsGrouped
+                alerts={alerts}
+                prices={prices}
                 onRemoveAlert={handleRemoveAlert}
                 isFullPage={true}
               />

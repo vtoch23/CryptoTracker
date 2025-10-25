@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, BigInteger, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
@@ -74,3 +74,25 @@ class TopGainerLoser(Base):
     price_change_percentage_24h = Column(Float)
     is_gainer = Column(Boolean)  # True for gainer, False for loser
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Top100(Base):
+    __tablename__ = "top100"
+    id = Column(Integer, primary_key=True, index=True)
+    coin_id = Column(String, unique=True, nullable=False)
+    symbol = Column(String, nullable=False)
+
+class CoinHistory(Base):
+    __tablename__ = "coin_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    coin_id = Column(String, index=True, nullable=False)
+    symbol = Column(String, index=True, nullable=False)
+    date = Column(String, index=True, nullable=False)
+    timestamp = Column(BigInteger, nullable=False)
+    open = Column(Float, nullable=False)
+    high = Column(Float, nullable=False)
+    low = Column(Float, nullable=False)
+    close = Column(Float, nullable=False)
+    
+    __table_args__ = (UniqueConstraint('coin_id', 'date', name='uix_coin_date'),)
