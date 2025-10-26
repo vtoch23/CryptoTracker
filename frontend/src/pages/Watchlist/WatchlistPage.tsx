@@ -22,7 +22,7 @@ export default function AddToWatchlistForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const item = { symbol, target_price: targetPrice };
+      const item = { symbol};
       const added = await addToWatchlist(item);
       alert(`${added.symbol} added successfully`);
       setSymbol("");
@@ -56,7 +56,7 @@ export default function AddToWatchlistForm() {
       <ul>
         {watchlist.map((item) => (
           <li key={item.id}>
-            {item.symbol} - Target: {item.target_price} - Added: {new Date(item.created_at).toLocaleString()}
+            {item.symbol} - Added: {new Date(item.created_at).toLocaleString()}
           </li>
         ))}
       </ul>

@@ -4,7 +4,6 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export interface WatchlistItemCreate {
   symbol: string;
-  target_price?: number;
 }
 
 export const addToWatchlist = async (item: WatchlistItemCreate) => {
@@ -25,7 +24,6 @@ export const addToWatchlist = async (item: WatchlistItemCreate) => {
 export interface WatchlistItem {
   id: number;
   symbol: string;
-  target_price?: number;
   created_at: string;
 }
 

@@ -16,12 +16,24 @@ class UserOut(BaseModel):
 
 class WatchlistItemCreate(BaseModel):
     symbol: str
-    target_price: Optional[float]
 
 class WatchlistItemOut(BaseModel):
     id: int
     symbol: str
-    target_price: Optional[float]
+    coin_id: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class AlertItemCreate(BaseModel):
+    symbol: str
+    target_price: float
+
+class AlertItemOut(BaseModel):
+    id: int
+    symbol: str
+    target_price: float
     created_at: datetime
 
     class Config:
@@ -31,6 +43,14 @@ class PricePointOut(BaseModel):
     symbol: str
     price: float
     timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+class CoinOut(BaseModel):
+    id: int
+    coin_id: str
+    symbol: str
 
     class Config:
         from_attributes = True
@@ -50,6 +70,14 @@ class CostBasisOut(BaseModel):
     cost_price: float
     quantity: float
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class Top100Out(BaseModel):
+    id: int
+    coin_id: str
+    symbol: str
 
     class Config:
         from_attributes = True

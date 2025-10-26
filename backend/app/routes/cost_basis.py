@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from typing import List
 from app import models, schemas, dependencies
 
 router = APIRouter(prefix="/cost-basis", tags=["cost-basis"])
 
-@router.get("/", response_model=list[schemas.CostBasisOut])
+@router.get("/", response_model=List[schemas.CostBasisOut])
 def get_cost_basis(
     db: Session = Depends(dependencies.get_db),
     user: models.User = Depends(dependencies.get_current_user)

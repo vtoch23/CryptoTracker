@@ -8,7 +8,7 @@ export default function TriggerFetch() {
 
   const fetchData = async () => {
     try {
-      const res = await axios.post(`${API_URL}/fetch/fetch`);
+      const res = await axios.post(`${API_URL}/fetch`);
       setStatus(res.data.message || "Fetch triggered successfully!");
     } catch (err: any) {
       setStatus(`Error: ${err.response?.status} ${err.response?.data?.detail || err.message}`);

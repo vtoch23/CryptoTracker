@@ -1,187 +1,221 @@
 from fastapi import APIRouter, HTTPException, Query
-from app.tasks.fetch_and_store_prices import get_available_coins, SYMBOLS
+from app import models
+from app.database import SessionLocal
 from pycoingecko import CoinGeckoAPI
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/charts", tags=["charts"])
 
-@router.get("/available-coins")
-def get_coins():
-    """Get list of all available coins"""
-    try:
-        coins = get_available_coins()
-        return coins
-    except Exception as e:
-        logger.error(f"Error fetching coins: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/chart/{symbol}")
-def get_chart(
-    symbol: str,
-    days: int = Query(30, description="Number of days for chart"),
-    interval: str = Query("4h", description="Interval: daily, 4h, 1h")
-):
-    """Get price chart data for a symbol with candle data"""
-    try:
-        logger.info(f"Fetching chart for {symbol} - {days} days - interval: {interval}")
-        
-        # Find coin ID from symbol
-        coin_id = None
-        for name, sym in SYMBOLS.items():
-            if sym.upper() == symbol.upper():
-                coin_id = name
-                break
-        
-        if not coin_id:
-            logger.warning(f"Symbol {symbol} not found in SYMBOLS")
-            raise HTTPException(status_code=404, detail=f"Symbol {symbol} not found")
-        
-        logger.info(f"Found coin_id: {coin_id} for symbol: {symbol}")
-        
-        cg = CoinGeckoAPI()
-        
-        try:
-            # Fetch OHLC data for candles
-            ohlc_data = cg.get_coin_ohlc_by_id(
-                id=coin_id,
-                vs_currency="usd",
-                days=days
-            )
-            print(ohlc_data)
-            if not ohlc_data:
-                raise HTTPException(status_code=404, detail=f"No OHLC data found for {symbol}")
-            
-            # Transform OHLC to candle format
-            candles = []
-            for candle in ohlc_data:
-                print(candle)
-                try:
-                    timestamp, open_price, high_price, low_price, close_price = candle[0], candle[1], candle[2], candle[3], candle[4]
-                    candles.append({
-                        "timestamp": timestamp,
-                        "date": _timestamp_to_date(timestamp),
-                        "open": float(open_price),
-                        "high": float(high_price),
-                        "low": float(low_price),
-                        "close": float(close_price),
-                        "x": _timestamp_to_date(timestamp)
-                    })
-                except (IndexError, TypeError, ValueError) as e:
-                    logger.warning(f"Error parsing candle: {e}")
-                    continue
-            
-            if not candles:
-                raise HTTPException(status_code=404, detail="Failed to parse candle data")
-            
-            logger.info(f"Successfully fetched {len(candles)} candles for {symbol}")
-            
-            return {
-                "status": "success",
-                "symbol": symbol,
-                "candles": candles,
-                "interval": interval
-            }
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error fetching OHLC for {symbol}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to fetch chart data: {str(e)}")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in get_chart: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.get("/history/{symbol}")
-def get_history(
-    symbol: str,
-    days: int = Query(30, description="Number of days")
-):
-    """Get OHLC history data for displaying price history"""
-    try:
-        logger.info(f"Fetching history for {symbol} - {days} days")
-        
-        # Find coin ID from symbol
-        coin_id = None
-        for name, sym in SYMBOLS.items():
-            if sym.upper() == symbol.upper():
-                coin_id = name
-                break
-        
-        if not coin_id:
-            logger.warning(f"Coin not found for symbol: {symbol}")
-            logger.warning(f"Available symbols in SYMBOLS: {list(SYMBOLS.values())}")
-            raise HTTPException(status_code=404, detail=f"Symbol {symbol} not found")
-        
-        logger.info(f"Found coin_id: {coin_id} for symbol: {symbol}")
-        
-        cg = CoinGeckoAPI()
-        
-        try:
-            # Fetch OHLC data
-            ohlc_data = cg.get_coin_ohlc_by_id(
-                id=coin_id,
-                vs_currency="usd",
-                days=days
-            )
-            
-            if not ohlc_data:
-                raise HTTPException(status_code=404, detail=f"No history data found for {symbol}")
-            
-            # Transform OHLC data to format needed for frontend
-            history = []
-            for candle in ohlc_data:
-                try:
-                    if len(candle) >= 5:
-                        timestamp = candle[0]
-                        open_price = float(candle[1])
-                        high_price = float(candle[2])
-                        low_price = float(candle[3])
-                        close_price = float(candle[4])
-                        
-                        history.append({
-                            "timestamp": timestamp,
-                            "date": _timestamp_to_date(timestamp),
-                            "open": open_price,
-                            "high": high_price,
-                            "low": low_price,
-                            "close": close_price
-                        })
-                except (IndexError, TypeError, ValueError) as e:
-                    logger.warning(f"Error parsing history candle: {e}")
-                    continue
-            
-            if not history:
-                raise HTTPException(status_code=500, detail="Failed to parse history data")
-            
-            logger.info(f"Successfully fetched {len(history)} history entries for {symbol}")
-            
-            return {
-                "status": "success",
-                "symbol": symbol,
-                "history": history
-            }
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error fetching OHLC for {symbol}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in get_history: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+_cache = {}
+
+def get_cached_ohlc(coin_id, days):
+    key = f"{coin_id}_{days}"
+    now = datetime.utcnow()
+    # expire after 15 min
+    if key in _cache:
+        entry = _cache[key]
+        if now - entry["time"] < timedelta(minutes=15):
+            return entry["data"]
+    return None
+
+def set_cached_ohlc(coin_id, days, data):
+    _cache[f"{coin_id}_{days}"] = {"data": data, "time": datetime.utcnow()}
+
+
+# Canonical coin priority map for duplicate symbols
+PRIORITY_COIN_IDS = {
+    'BTC': 'bitcoin',
+    'ETH': 'ethereum',
+    'XRP': 'ripple',
+    'NEAR': 'near',
+    'RENDER': 'render-token',
+    'STX': 'blockstack',
+    'APT': 'aptos',
+    'INJ': 'injective-protocol',
+    'OP': 'optimism',
+    'BCH': 'bitcoin-cash',
+    'BSV': 'bitcoin-sv',
+    'BTG': 'bitcoin-gold',
+}
 
 
 def _timestamp_to_date(timestamp_ms):
-    """Convert milliseconds timestamp to date string"""
+    """Convert timestamp (ms) to date string."""
     try:
         return datetime.fromtimestamp(timestamp_ms / 1000).strftime("%Y-%m-%d")
     except Exception as e:
         logger.error(f"Error converting timestamp {timestamp_ms}: {e}")
         return "N/A"
+
+
+# -------------------------------------------------------------------------
+# /charts/available-coins
+# -------------------------------------------------------------------------
+@router.get("/available-coins")
+def get_available_coins():
+    """Return a deduplicated list of coins for dropdown."""
+    db = SessionLocal()
+    try:
+        coins = db.query(models.Coin).all()
+    except Exception as e:
+        logger.error(f"DB error fetching coins: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database error")
+    finally:
+        db.close()
+
+    if not coins:
+        logger.warning("No coins in database.")
+        return []
+
+    symbol_map = {}
+    for coin in coins:
+        sym = coin.symbol.upper()
+        if sym not in symbol_map:
+            symbol_map[sym] = coin
+        elif sym in PRIORITY_COIN_IDS and coin.coin_id == PRIORITY_COIN_IDS[sym]:
+            symbol_map[sym] = coin
+
+    result = [{"id": c.coin_id, "symbol": c.symbol} for c in symbol_map.values()]
+    result.sort(key=lambda x: x["symbol"])
+    logger.info(f"Returning {len(result)} coins to frontend")
+    return result
+
+
+# -------------------------------------------------------------------------
+# /charts/chart/{coin_id}
+# -------------------------------------------------------------------------
+@router.get("/chart/{coin_id}")
+def get_chart(
+    coin_id: str,
+    days: int = Query(30, ge=1, le=365),
+    interval: str = Query("4h", description="Chart interval (UI hint only)"),
+):
+    """Return OHLC chart data for a coin (for charts tab)."""
+    db = SessionLocal()
+    try:
+        coin = db.query(models.Coin).filter(models.Coin.coin_id.ilike(coin_id)).first()
+    finally:
+        db.close()
+
+    if not coin:
+        raise HTTPException(status_code=404, detail=f"Coin {coin_id} not found")
+
+    cg = CoinGeckoAPI()
+    logger.info(f"Fetching chart for {coin.symbol} ({coin.coin_id}), {days} days")
+
+    try:
+        cached = get_cached_ohlc(coin.coin_id, days)
+        if cached is not None:
+            logger.info(f"Using cached OHLC for {coin.coin_id} ({days}d)")
+            ohlc_data = cached
+        else:
+            ohlc_data = cg.get_coin_ohlc_by_id(id=coin.coin_id, vs_currency="usd", days=_normalize_days(days))
+            set_cached_ohlc(coin.coin_id, days, ohlc_data)
+        
+    except Exception as e:
+        logger.error(f"Error fetching OHLC for {coin.coin_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"CoinGecko error: {str(e)}")
+
+    if not ohlc_data:
+        raise HTTPException(status_code=404, detail=f"No OHLC data for {coin.symbol}")
+
+    candles = []
+    for i, c in enumerate(ohlc_data):
+        try:
+            if not isinstance(c, (list, tuple)) or len(c) < 5:
+                continue
+            ts, o, h, l, cl = int(c[0]), float(c[1]), float(c[2]), float(c[3]), float(c[4])
+            if any(v <= 0 for v in (o, h, l, cl)):
+                continue
+            d = _timestamp_to_date(ts)
+            candles.append({
+                "timestamp": ts,
+                "date": d,
+                "open": o,
+                "high": h,
+                "low": l,
+                "close": cl,
+                "x": d,
+            })
+        except Exception as e:
+            logger.warning(f"Skipping candle {i}: {e}")
+            continue
+
+    return {
+        "status": "success",
+        "symbol": coin.symbol,
+        "coin_id": coin.coin_id,
+        "candles": candles,
+        "interval": interval,
+        "count": len(candles),
+    }
+
+
+def _normalize_days(days: int) -> int:
+    valid_days = [1, 7, 14, 30, 90, 180, 365]
+    return min(valid_days, key=lambda d: abs(d - days))
+
+
+@router.get("/history/{coin_id}")
+def get_history(coin_id: str, days: int = Query(30, ge=1, le=365)):
+    """Return OHLC history (table view)."""
+    coin_id = coin_id.lower()
+    db = SessionLocal()
+    try:
+        coin = db.query(models.Coin).filter(models.Coin.coin_id.ilike(coin_id)).first()
+    finally:
+        db.close()
+
+    if not coin:
+        raise HTTPException(status_code=404, detail=f"Coin {coin_id} not found")
+
+    cg = CoinGeckoAPI()
+    logger.info(f"Fetching history for {coin.symbol} ({coin.coin_id}), {days} days")
+
+    try:
+        cached = get_cached_ohlc(coin.coin_id, days)
+        if cached is not None:
+            logger.info(f"Using cached OHLC for {coin.coin_id} ({days}d)")
+            ohlc_data = cached
+        else:
+            ohlc_data = cg.get_coin_ohlc_by_id(id=coin.coin_id, vs_currency="usd", days=_normalize_days(days))
+            set_cached_ohlc(coin.coin_id, days, ohlc_data)
+    except Exception as e:
+        logger.error(f"CoinGecko error for {coin.coin_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"CoinGecko error: {str(e)}")
+
+    if not ohlc_data:
+        raise HTTPException(status_code=404, detail=f"No OHLC data for {coin.symbol}")
+
+    history = []
+    for i, c in enumerate(ohlc_data):
+        try:
+            if not isinstance(c, (list, tuple)) or len(c) < 5:
+                continue
+            ts, o, h, l, cl = int(c[0]), float(c[1]), float(c[2]), float(c[3]), float(c[4])
+            if any(v <= 0 for v in (o, h, l, cl)):
+                continue
+            history.append({
+                "timestamp": ts,
+                "date": _timestamp_to_date(ts),
+                "open": o,
+                "high": h,
+                "low": l,
+                "close": cl,
+            })
+        except Exception as e:
+            logger.warning(f"Skipping candle {i}: {e}")
+            continue
+
+    logger.info(f"Returning {len(history)} history entries for {coin.symbol}")
+    return {
+        "status": "success",
+        "symbol": coin.symbol,
+        "coin_id": coin.coin_id,
+        "history": history,
+        "count": len(history),
+    }
