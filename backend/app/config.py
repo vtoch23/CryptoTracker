@@ -16,8 +16,10 @@ def running_in_docker() -> bool:
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg2://crypto_user:crypto_pass@localhost:5433/crypto"
-    SECRET_KEY: str = "supersecretkey"
+    SECRET_KEY: str = os.getenv('SECRET_KEY')
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    COINGECKO_API_KEY: str = os.getenv('CoinGecko_API_KEY')
+    COINGECKO_PRICE_URL: str = os.getenv('COINGECKO_PRICE_URL')
 
     CELERY_BROKER_URL: str = "amqp://guest:guest@localhost:5672//"
     CELERY_RESULT_BACKEND: str = "rpc://"

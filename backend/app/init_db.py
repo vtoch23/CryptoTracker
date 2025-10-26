@@ -347,21 +347,17 @@ def initialize_database():
     Run all initialization tasks.
     Call this from FastAPI startup event.
     """
-    logger.info("=" * 60)
     logger.info("DATABASE INITIALIZATION STARTED")
-    logger.info("=" * 60)
     
     try:
         # Initialize tables in order
-        init_coin_history_table()  # Create history table first
-        init_coins_table()
-        init_top100_table()
-        init_trending_coins()
-        init_gainers_losers()
+        # init_coin_history_table()  # Create history table first
+        # init_coins_table()
+        # init_top100_table()
+        # init_trending_coins()
+        # init_gainers_losers()
         
-        logger.info("=" * 60)
         logger.info("DATABASE INITIALIZATION COMPLETE")
-        logger.info("=" * 60)
         return True
         
     except Exception as e:

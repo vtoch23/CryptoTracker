@@ -84,7 +84,7 @@ export default function Dashboard() {
       const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
       const [pricesRes, watchlistRes, alertsRes, costRes] = await Promise.allSettled([
-        fetch(`${API_URL}/prices`, { headers }),
+        fetch(`${API_URL}/prices/`, { headers }),
         fetch(`${API_URL}/watchlist/`, { headers }),
         fetch(`${API_URL}/alerts/`, { headers }),
         fetch(`${API_URL}/cost-basis/`, { headers }),
@@ -95,7 +95,7 @@ export default function Dashboard() {
       } else {
         setPrices([]);
       }
-
+      console.log("prices received on fetch", prices);
       if (watchlistRes.status === "fulfilled" && watchlistRes.value.ok) {
         setWatchlist(await watchlistRes.value.json());
       } else {
@@ -129,7 +129,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchAllCoins();
+    // fetchAllCoins();
     fetchAllData();
     fetchMarketPrices();
   }, [token]);

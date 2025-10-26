@@ -47,9 +47,7 @@ root_logger.addHandler(console_handler)
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
-logger.info("=" * 100)
 logger.info(f"Application started - Logs will be written to: {log_filename}")
-logger.info("=" * 100)
 
 app = FastAPI(title="CryptoTracker API", debug=True)
 

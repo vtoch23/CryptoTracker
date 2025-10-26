@@ -1,13 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional, Literal
+from typing import List, Optional
 from app import models, schemas, dependencies
-from pycoingecko import CoinGeckoAPI
 import logging
 from sqlalchemy import func
+from app.worker.celery_app import celery_app
+import time
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/prices", tags=["prices"])
+
+# manually refresh from user
+# trigger fetch celery task to update prices and query database for latest prices
 
 @router.get("/", response_model=List[schemas.PricePointOut])
 @router.get("", response_model=List[schemas.PricePointOut])  # Handle both with/without trailing slash
@@ -17,8 +21,10 @@ def get_latest_prices(db: Session = Depends(dependencies.get_db)):
     Fetches latest price point for each symbol in watchlist.
     """
     try:
-        logger.info("=== GET LATEST PRICES ===")
-        
+        logger.info("Fetch called by user")
+        success =  celery_app.send_task('app.tasks.fetch_and_store_prices')
+        time.sleep(2)
+        logger.info("Celery task result: ", success)
         # Get all unique symbols from watchlist
         watchlist_symbols = (
             db.query(models.WatchlistItem.symbol)
@@ -34,33 +40,34 @@ def get_latest_prices(db: Session = Depends(dependencies.get_db)):
         symbols = [s[0] for s in watchlist_symbols]
         logger.info(f"Watchlist has {len(symbols)} unique symbols: {symbols}")
         
-        # Get the latest price for each symbol
-        subquery = (
-            db.query(
-                models.PricePoint.symbol,
-                func.max(models.PricePoint.id).label("max_id")
+        # Get the latest price for each symbol from db
+        if success:
+            subquery = (
+                db.query(
+                    models.PricePoint.symbol,
+                    func.max(models.PricePoint.id).label("max_id")
+                )
+                .filter(models.PricePoint.symbol.in_(symbols))
+                .group_by(models.PricePoint.symbol)
+                .subquery()
             )
-            .filter(models.PricePoint.symbol.in_(symbols))
-            .group_by(models.PricePoint.symbol)
-            .subquery()
-        )
-        
-        latest_prices = (
-            db.query(models.PricePoint)
-            .join(
-                subquery,
-                (models.PricePoint.symbol == subquery.c.symbol) &
-                (models.PricePoint.id == subquery.c.max_id)
+            
+            latest_prices = (
+                db.query(models.PricePoint)
+                .join(
+                    subquery,
+                    (models.PricePoint.symbol == subquery.c.symbol) &
+                    (models.PricePoint.id == subquery.c.max_id)
+                )
+                .all()
             )
-            .all()
-        )
-        
-        if not latest_prices:
-            logger.warning("No prices in database for watchlist symbols")
-            return []
-        
-        logger.info(f"Returning {len(latest_prices)} prices from database")
-        return latest_prices
+            
+            if not latest_prices:
+                logger.warning("No prices in database for watchlist symbols")
+                return []
+            
+            logger.info(f"Returning {len(latest_prices)} prices from database")
+            return latest_prices
         
     except Exception as e:
         logger.error(f"Error in get_latest_prices: {e}", exc_info=True)

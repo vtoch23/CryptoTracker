@@ -35,39 +35,39 @@ celery_app.conf.update(
 # Import tasks to register them
 from app.tasks.fetch_and_store_prices import fetch_and_store_prices, update_coins_list
 from app.tasks.check_price_alerts import check_price_alerts
-from app.tasks.fetch_market_data import fetch_trending_coins, fetch_top_gainers_losers
+# from app.tasks.fetch_market_data import fetch_trending_coins, fetch_top_gainers_losers
 
 # Celery Beat Schedule
 celery_app.conf.beat_schedule = {
-    # Fetch prices every 10 minutes
-    'fetch-prices-every-10-minutes': {
+    # Fetch prices every hour
+    'fetch-prices-every-hour': {
         'task': 'app.tasks.fetch_and_store_prices',
-        'schedule': crontab(minute='*/10'),  # Every 5 minutes
+        'schedule': crontab(minute='20'),  
     },
     
-    # Check price alerts every 10 minutes
-    'check-alerts-every-10-minutes': {
-        'task': 'app.tasks.check_price_alerts',
-        'schedule': crontab(minute='*/10'),  # Every 5 minutes
-    },
+    # # Check price alerts every hour
+    # 'check-alerts-every-hour': {
+    #     'task': 'app.tasks.check_price_alerts',
+    #     'schedule': crontab(minute='12'),  
+    # },
     
-    # Update coins list once a week (Sunday at 3 AM)
-    'update-coins-list-weekly': {
-        'task': 'app.tasks.update_coins_list',
-        'schedule': crontab(hour=3, minute=0, day_of_week=1),  # Sunday 3 AM
-    },
+    # Update coins list once a month 
+    # 'update-coins-list-monthly': {
+    #     'task': 'app.tasks.update_coins_list',
+    #     'schedule': crontab(0, 0, day_of_month='1'), 
+    # },
     
-    # Fetch trending coins every hour
-    'fetch-trending-coins-hourly': {
-        'task': 'app.tasks.fetch_trending_coins',
-        'schedule': crontab(minute=0),  # Every hour at minute 0
-    },
+    # Fetch trending coins every day
+    # 'fetch-trending-coins-daily': {
+    #     'task': 'app.tasks.fetch_trending_coins',
+    #     'schedule': crontab(hour=0),  
+    # },
     
-    # Fetch top gainers and losers every hour
-    'fetch-gainers-losers-hourly': {
-        'task': 'app.tasks.fetch_top_gainers_losers',
-        'schedule': crontab(minute=5),  # Every hour at minute 5
-    },
+    # # Fetch top gainers and losers every day
+    # 'fetch-gainers-losers-daily': {
+    #     'task': 'app.tasks.fetch_top_gainers_losers',
+    #     'schedule': crontab(hour=5),  # Every hour at minute 5
+    # },
 }
 
 if __name__ == '__main__':

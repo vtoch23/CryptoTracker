@@ -32,7 +32,7 @@ export default function LatestPrices() {
     if (!token) return;
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/fetch/fetch`, {}, {
+      await axios.post(`${API_URL}/fetch`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
       await fetchPrices(); // reload prices after fetch

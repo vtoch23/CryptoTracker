@@ -34,9 +34,7 @@ def populate_trending():
     """Fetch and store trending coins"""
     db = SessionLocal()
     try:
-        logger.info("\n" + "="*60)
         logger.info("FETCHING TRENDING COINS")
-        logger.info("="*60)
         
         cg = CoinGeckoAPI()
         trending_data = cg.get_search_trending()
@@ -95,9 +93,7 @@ def populate_gainers_losers():
     """Fetch and store top gainers and losers using free tier API"""
     db = SessionLocal()
     try:
-        logger.info("\n" + "="*60)
         logger.info("FETCHING TOP GAINERS & LOSERS")
-        logger.info("="*60)
         
         cg = CoinGeckoAPI()
         
@@ -208,9 +204,7 @@ def verify_data():
     """Verify data was populated"""
     db = SessionLocal()
     try:
-        logger.info("\n" + "="*60)
         logger.info("VERIFICATION")
-        logger.info("="*60)
         
         trending_count = db.query(TrendingCoin).count()
         gainers_count = db.query(TopGainerLoser).filter_by(is_gainer=True).count()
@@ -324,9 +318,7 @@ def populate_top_100():
 
 def main():
     """Main execution"""
-    logger.info("="*60)
     logger.info("MARKET DATA POPULATION")
-    logger.info("="*60)
     
     try:
         # Create tables
@@ -342,14 +334,10 @@ def main():
         verify_ok = verify_data()
         
         if trending_ok and gainers_ok and verify_ok:
-            logger.info("\n" + "="*60)
             logger.info("SUCCESS - Market data ready!")
-            logger.info("="*60)
             return 0
         else:
-            logger.warning("\n" + "="*60)
             logger.warning("COMPLETED WITH WARNINGS")
-            logger.warning("="*60)
             return 1
             
     except KeyboardInterrupt:
