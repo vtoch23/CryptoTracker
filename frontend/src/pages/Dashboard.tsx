@@ -129,7 +129,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    // fetchAllCoins();
+    fetchAllCoins();
     fetchAllData();
     fetchMarketPrices();
   }, [token]);
