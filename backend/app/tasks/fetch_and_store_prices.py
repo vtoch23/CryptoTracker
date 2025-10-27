@@ -251,7 +251,7 @@ def fetch_and_store_prices():
                 
                 all_prices.update(response)
                 logger.info(f"Batch {i//batch_size + 1} returned {len(response)} prices")
-                
+                logger.info(f"Prices returned {response}")
             except Exception as e:
                 logger.error(f"Error fetching batch {i//batch_size}: {e}")
                 continue
