@@ -21,6 +21,7 @@ class WatchlistItemOut(BaseModel):
     id: int
     symbol: str
     coin_id: str
+    order: int
     created_at: datetime
 
     class Config:

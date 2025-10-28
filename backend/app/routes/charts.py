@@ -9,17 +9,19 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/charts", tags=["charts"])
 
-
+# Constants
+CACHE_EXPIRATION_HOURS = 2
+INTERVAL_4H_MS = 4 * 60 * 60 * 1000  # 4 hours in milliseconds
+INTERVAL_DAILY_MS = 24 * 60 * 60 * 1000  # 1 day in milliseconds
 
 _cache = {}
 
 def get_cached_ohlc(coin_id, days):
     key = f"{coin_id}_{days}"
     now = datetime.utcnow()
-    # expire after 2 hours (chart data doesn't need to be real-time)
     if key in _cache:
         entry = _cache[key]
-        if now - entry["time"] < timedelta(hours=2):
+        if now - entry["time"] < timedelta(hours=CACHE_EXPIRATION_HOURS):
             return entry["data"]
     return None
 
@@ -66,11 +68,9 @@ def _convert_prices_to_candles(prices, days):
 
     # Determine grouping interval based on days
     if days <= 7:
-        # For 7 days or less, use 4-hour intervals
-        interval_ms = 4 * 60 * 60 * 1000  # 4 hours in milliseconds
+        interval_ms = INTERVAL_4H_MS
     else:
-        # For longer periods, use daily intervals
-        interval_ms = 24 * 60 * 60 * 1000  # 1 day in milliseconds
+        interval_ms = INTERVAL_DAILY_MS
 
     # Group prices by interval
     groups = defaultdict(list)
@@ -93,7 +93,6 @@ def _convert_prices_to_candles(prices, days):
             "high": max(prices_in_interval),
             "low": min(prices_in_interval),
             "close": prices_in_interval[-1],
-            "x": _timestamp_to_date(interval_ts),
         })
 
     return candles
@@ -120,7 +119,6 @@ def _convert_ohlc_to_candles(ohlc_data):
                 "high": h,
                 "low": l,
                 "close": cl,
-                "x": d,
             })
         except Exception as e:
             logger.warning(f"Skipping candle {i}: {e}")
@@ -159,6 +157,46 @@ def get_available_coins():
     return result
 
 
+def _fetch_chart_data_with_cache(coin_id: str, days: int):
+    """
+    Fetch chart data from CoinGecko API with caching and fallback logic.
+    Returns tuple of (raw_data, is_market_chart).
+    """
+    api_key = settings.COINGECKO_API_KEY
+    if api_key:
+        cg = CoinGeckoAPI(demo_api_key=api_key)
+        logger.info(f"Fetching chart for {coin_id}, {days} days (Using API key)")
+    else:
+        cg = CoinGeckoAPI()
+        logger.info(f"Fetching chart for {coin_id}, {days} days (No API key)")
+
+    # Check cache first
+    cached = get_cached_ohlc(coin_id, days)
+    if cached is not None:
+        logger.info(f"Using cached chart data for {coin_id} ({days}d)")
+        is_market_chart = "prices" in cached
+        return cached, is_market_chart
+
+    # Fetch new data with fallback
+    try:
+        market_data = cg.get_coin_market_chart_by_id(id=coin_id, vs_currency="usd", days=days)
+        raw_data = market_data
+        is_market_chart = True
+        set_cached_ohlc(coin_id, days, raw_data)
+    except Exception as market_err:
+        logger.warning(f"Market chart failed, trying OHLC: {market_err}")
+        try:
+            ohlc_data = cg.get_coin_ohlc_by_id(id=coin_id, vs_currency="usd", days=days)
+            raw_data = ohlc_data
+            is_market_chart = False
+            set_cached_ohlc(coin_id, days, raw_data)
+        except Exception as ohlc_err:
+            logger.error(f"Both APIs failed for {coin_id}: {ohlc_err}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"CoinGecko error: {str(ohlc_err)}")
+
+    return raw_data, is_market_chart
+
+
 # /charts/chart/{coin_id}
 @router.get("/chart/{coin_id}")
 def get_chart(
@@ -176,40 +214,8 @@ def get_chart(
     if not coin:
         raise HTTPException(status_code=404, detail=f"Coin {coin_id} not found")
 
-    # Use demo_api_key parameter for CoinGecko Demo/Pro API
-    api_key = settings.COINGECKO_API_KEY
-    if api_key:
-        cg = CoinGeckoAPI(demo_api_key=api_key)
-        logger.info(f"Fetching chart for {coin.symbol} ({coin.coin_id}), {days} days (Using API key)")
-    else:
-        cg = CoinGeckoAPI()
-        logger.info(f"Fetching chart for {coin.symbol} ({coin.coin_id}), {days} days (No API key)")
-
-    try:
-        # First try get_coin_market_chart_by_id (more detailed data)
-        cached = get_cached_ohlc(coin.coin_id, days)
-        if cached is not None:
-            logger.info(f"Using cached chart data for {coin.coin_id} ({days}d)")
-            raw_data = cached
-            is_market_chart = "prices" in cached
-        else:
-            try:
-                # Try market_chart first for more granular data
-                market_data = cg.get_coin_market_chart_by_id(id=coin.coin_id, vs_currency="usd", days=days)
-                raw_data = market_data
-                is_market_chart = True
-                set_cached_ohlc(coin.coin_id, days, raw_data)
-            except Exception as market_err:
-                logger.warning(f"Market chart failed, trying OHLC: {market_err}")
-                # Fall back to OHLC if market_chart fails
-                ohlc_data = cg.get_coin_ohlc_by_id(id=coin.coin_id, vs_currency="usd", days=days)
-                raw_data = ohlc_data
-                is_market_chart = False
-                set_cached_ohlc(coin.coin_id, days, raw_data)
-
-    except Exception as e:
-        logger.error(f"Error fetching chart for {coin.coin_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"CoinGecko error: {str(e)}")
+    # Fetch data with caching and fallback
+    raw_data, is_market_chart = _fetch_chart_data_with_cache(coin.coin_id, days)
 
     # Convert data to candles based on format
     if is_market_chart:
@@ -220,7 +226,6 @@ def get_chart(
             raise HTTPException(status_code=404, detail=f"No price data for {coin.symbol}")
         candles = _convert_prices_to_candles(prices, days)
     else:
-        # Process OHLC data
         if not raw_data:
             raise HTTPException(status_code=404, detail=f"No OHLC data for {coin.symbol}")
         candles = _convert_ohlc_to_candles(raw_data)
@@ -233,11 +238,6 @@ def get_chart(
         "interval": interval,
         "count": len(candles),
     }
-
-
-def _normalize_days(days: int) -> int:
-    valid_days = [1, 7, 14, 30, 90, 180, 365]
-    return min(valid_days, key=lambda d: abs(d - days))
 
 
 @router.get("/history/{coin_id}")
@@ -253,38 +253,8 @@ def get_history(coin_id: str, days: int = Query(30, ge=1, le=365)):
     if not coin:
         raise HTTPException(status_code=404, detail=f"Coin {coin_id} not found")
 
-    # Use demo_api_key parameter for CoinGecko Demo/Pro API
-    api_key = settings.COINGECKO_API_KEY
-    if api_key:
-        cg = CoinGeckoAPI(demo_api_key=api_key)
-        logger.info(f"Fetching history for {coin.symbol} ({coin.coin_id}), {days} days (Using API key)")
-    else:
-        cg = CoinGeckoAPI()
-        logger.info(f"Fetching history for {coin.symbol} ({coin.coin_id}), {days} days (No API key)")
-
-    try:
-        cached = get_cached_ohlc(coin.coin_id, days)
-        if cached is not None:
-            logger.info(f"Using cached data for {coin.coin_id} ({days}d)")
-            raw_data = cached
-            is_market_chart = "prices" in cached
-        else:
-            try:
-                # Try market_chart first
-                market_data = cg.get_coin_market_chart_by_id(id=coin.coin_id, vs_currency="usd", days=days)
-                raw_data = market_data
-                is_market_chart = True
-                set_cached_ohlc(coin.coin_id, days, raw_data)
-            except Exception as market_err:
-                logger.warning(f"Market chart failed for history, trying OHLC: {market_err}")
-                # Fall back to OHLC
-                ohlc_data = cg.get_coin_ohlc_by_id(id=coin.coin_id, vs_currency="usd", days=days)
-                raw_data = ohlc_data
-                is_market_chart = False
-                set_cached_ohlc(coin.coin_id, days, raw_data)
-    except Exception as e:
-        logger.error(f"CoinGecko error for {coin.coin_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"CoinGecko error: {str(e)}")
+    # Fetch data with caching and fallback
+    raw_data, is_market_chart = _fetch_chart_data_with_cache(coin.coin_id, days)
 
     # Convert data to history based on format
     if is_market_chart:

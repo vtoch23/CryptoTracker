@@ -17,6 +17,7 @@ class WatchlistItem(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     symbol = Column(String, index=True)
     coin_id = Column(String, index=True)
+    order = Column(Integer, default=0, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class AlertsItem(Base):

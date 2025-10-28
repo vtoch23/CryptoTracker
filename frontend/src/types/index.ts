@@ -7,6 +7,7 @@ export interface WatchlistItem {
   id: number;
   symbol: string;
   coin_id: string;
+  order: number;
   created_at: string;
 }
 
@@ -45,7 +46,6 @@ export interface Candle {
   high: number;
   low: number;
   close: number;
-  x: string;
 }
 
 export interface TrendingCoin {

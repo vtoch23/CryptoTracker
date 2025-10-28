@@ -15,45 +15,51 @@ class WatchlistItemCreateByID(schemas.BaseModel):
 @router.post("/", response_model=schemas.WatchlistItemOut)
 def add_item(
     item: WatchlistItemCreateByID,  # Changed schema
-    db: Session = Depends(dependencies.get_db), 
+    db: Session = Depends(dependencies.get_db),
     user: models.User = Depends(dependencies.get_current_user)
 ):
     """Add a coin to watchlist using coin_id (unique identifier)"""
-    
+
     coin_id = item.coin_id.lower()
     logger.info(f"Adding to watchlist: coin_id={coin_id}, user_id={user.id}")
-    
+
     # Look up coin by coin_id (this is unique and unambiguous)
     coin = db.query(models.Coin).filter(
         models.Coin.coin_id.ilike(coin_id)
     ).first()
-    
+
     if not coin:
         logger.warning(f"Coin not found: {coin_id}")
         all_coins = db.query(models.Coin).limit(10).all()
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"Coin ID '{coin_id}' not found in database."
         )
-    
+
     logger.info(f"Found coin: {coin.symbol} ({coin.coin_id})")
-    
+
     # Check if already in watchlist
     existing_item = db.query(models.WatchlistItem).filter(
         models.WatchlistItem.user_id == user.id,
         models.WatchlistItem.coin_id == coin.coin_id  # Use coin_id
     ).first()
-    
+
     if existing_item:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"{coin.symbol} already in watchlist"
         )
-    
+
+    # Get the max order value and add 1 for new item
+    max_order = db.query(models.WatchlistItem).filter(
+        models.WatchlistItem.user_id == user.id
+    ).count()
+
     new_item = models.WatchlistItem(
         user_id=user.id,
         symbol=coin.symbol,
-        coin_id=coin.coin_id
+        coin_id=coin.coin_id,
+        order=max_order
     )
     db.add(new_item)
     db.commit()
@@ -63,14 +69,14 @@ def add_item(
 
 @router.get("/", response_model=List[schemas.WatchlistItemOut])
 def get_watchlist(
-    db: Session = Depends(dependencies.get_db), 
+    db: Session = Depends(dependencies.get_db),
     user: models.User = Depends(dependencies.get_current_user)
 ):
-    """Get all coins in watchlist for current user"""
+    """Get all coins in watchlist for current user, ordered by custom order"""
     items = db.query(models.WatchlistItem).filter(
         models.WatchlistItem.user_id == user.id
-    ).all()
-    
+    ).order_by(models.WatchlistItem.order).all()
+
     logger.info(f"Retrieved {len(items)} watchlist items for user {user.id}")
     return items
 
@@ -93,3 +99,36 @@ def remove_item(
     db.delete(item)
     db.commit()
     return None
+
+
+class WatchlistOrderUpdate(schemas.BaseModel):
+    item_ids: List[int]  # Ordered list of watchlist item IDs
+
+
+@router.put("/reorder", status_code=200)
+def reorder_watchlist(
+    order_update: WatchlistOrderUpdate,
+    db: Session = Depends(dependencies.get_db),
+    user: models.User = Depends(dependencies.get_current_user)
+):
+    """Update the order of watchlist items"""
+    logger.info(f"Reordering watchlist for user {user.id}: {order_update.item_ids}")
+
+    # Verify all items belong to the user
+    items = db.query(models.WatchlistItem).filter(
+        models.WatchlistItem.user_id == user.id,
+        models.WatchlistItem.id.in_(order_update.item_ids)
+    ).all()
+
+    if len(items) != len(order_update.item_ids):
+        raise HTTPException(status_code=400, detail="Some items not found or don't belong to user")
+
+    # Update order for each item
+    for index, item_id in enumerate(order_update.item_ids):
+        item = next((i for i in items if i.id == item_id), None)
+        if item:
+            item.order = index
+
+    db.commit()
+    logger.info(f"Successfully reordered {len(items)} watchlist items")
+    return {"status": "success", "updated": len(items)}
