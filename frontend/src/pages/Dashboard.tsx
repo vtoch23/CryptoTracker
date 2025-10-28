@@ -148,7 +148,8 @@ export default function Dashboard() {
       const historyData = data.history || [];
       setHistory(prev => new Map(prev).set(symbol, historyData));
     } catch (err: any) {
-      if (err.name !== "AbortError") {
+      // Ignore abort/cancel errors (user canceled or new request started)
+      if (err.name !== "AbortError" && err.name !== "CanceledError" && err.code !== "ERR_CANCELED") {
         console.error("History fetch error:", err);
         setError("Failed to load history");
         setTimeout(() => setError(""), 4000);
@@ -177,7 +178,8 @@ export default function Dashboard() {
       const candleData = data.candles || [];
       setCandles(prev => new Map(prev).set(symbol, candleData));
     } catch (err: any) {
-      if (err.name !== "AbortError") {
+      // Ignore abort/cancel errors (user canceled or new request started)
+      if (err.name !== "AbortError" && err.name !== "CanceledError" && err.code !== "ERR_CANCELED") {
         console.error("Chart fetch error:", err);
         setError("Failed to load chart");
         setTimeout(() => setError(""), 4000);
