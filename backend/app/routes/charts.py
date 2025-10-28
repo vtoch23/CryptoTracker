@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from app import models
 from app.database import SessionLocal
+from app.config import settings
 from pycoingecko import CoinGeckoAPI
 from datetime import datetime, timedelta
 import logging
@@ -15,10 +16,10 @@ _cache = {}
 def get_cached_ohlc(coin_id, days):
     key = f"{coin_id}_{days}"
     now = datetime.utcnow()
-    # expire after 15 min
+    # expire after 2 hours (chart data doesn't need to be real-time)
     if key in _cache:
         entry = _cache[key]
-        if now - entry["time"] < timedelta(minutes=15):
+        if now - entry["time"] < timedelta(hours=2):
             return entry["data"]
     return None
 
@@ -175,8 +176,14 @@ def get_chart(
     if not coin:
         raise HTTPException(status_code=404, detail=f"Coin {coin_id} not found")
 
-    cg = CoinGeckoAPI()
-    logger.info(f"Fetching chart for {coin.symbol} ({coin.coin_id}), {days} days")
+    # Use demo_api_key parameter for CoinGecko Demo/Pro API
+    api_key = settings.COINGECKO_API_KEY
+    if api_key:
+        cg = CoinGeckoAPI(demo_api_key=api_key)
+        logger.info(f"Fetching chart for {coin.symbol} ({coin.coin_id}), {days} days (Using API key)")
+    else:
+        cg = CoinGeckoAPI()
+        logger.info(f"Fetching chart for {coin.symbol} ({coin.coin_id}), {days} days (No API key)")
 
     try:
         # First try get_coin_market_chart_by_id (more detailed data)
@@ -246,8 +253,14 @@ def get_history(coin_id: str, days: int = Query(30, ge=1, le=365)):
     if not coin:
         raise HTTPException(status_code=404, detail=f"Coin {coin_id} not found")
 
-    cg = CoinGeckoAPI()
-    logger.info(f"Fetching history for {coin.symbol} ({coin.coin_id}), {days} days")
+    # Use demo_api_key parameter for CoinGecko Demo/Pro API
+    api_key = settings.COINGECKO_API_KEY
+    if api_key:
+        cg = CoinGeckoAPI(demo_api_key=api_key)
+        logger.info(f"Fetching history for {coin.symbol} ({coin.coin_id}), {days} days (Using API key)")
+    else:
+        cg = CoinGeckoAPI()
+        logger.info(f"Fetching history for {coin.symbol} ({coin.coin_id}), {days} days (No API key)")
 
     try:
         cached = get_cached_ohlc(coin.coin_id, days)
