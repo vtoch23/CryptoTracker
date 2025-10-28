@@ -1,6 +1,5 @@
-import React from "react";
 import type  { Candle } from "../types/index";
-import { formatPrice } from "../utils/helpers";
+import { formatPrice } from "../utils/priceFormatters";
 
 const CandleChart = ({ candles }: { candles: Candle[] }) => {
   if (!candles || candles.length === 0) {

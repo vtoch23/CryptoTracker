@@ -1,4 +1,3 @@
-// utils/priceFormatters.ts
 
 export const formatPrice = (price: number | undefined): string => {
   if (price === undefined || price === null) return "0.00";

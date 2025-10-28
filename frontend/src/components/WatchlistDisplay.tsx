@@ -1,7 +1,8 @@
 import React from "react";
 import { Trash2, BarChart3, Bell, ChevronDown } from "lucide-react";
 import CandleChart from "../components/CandleChart";
-import { formatPrice, deduplicateHistoryByDate } from "../utils/helpers";
+import { deduplicateHistoryByDate } from "../utils/helpers";
+import { formatPrice } from "../utils/priceFormatters";
 import type { AlertItem, Candle, CostBasis, HistoryItem } from "../types";
 
 interface WatchlistDisplayProps {
