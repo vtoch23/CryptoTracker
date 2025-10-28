@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TrendingUp, TrendingDown, Search, X } from "lucide-react";
-import type { AlertItem, TrendingCoin, TopGainerLoser, WatchlistItem } from "../types";
-import { API_URL, formatPrice, TOP_100_COINS } from "../utils/helpers";
+import type { TrendingCoin, TopGainerLoser, WatchlistItem } from "../types";
+import { API_URL, TOP_100_COINS } from "../utils/helpers";
+import { formatPrice } from "../utils/priceFormatters";
 
 function MarketDisplay({
   searchCoin,

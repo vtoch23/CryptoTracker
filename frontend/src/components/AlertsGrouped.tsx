@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Trash2 } from "lucide-react";
 import type { AlertItem, CoinPrice } from "../types";
-import { formatPrice } from "../utils/helpers";
+import { formatPrice } from "../utils/priceFormatters";
 
 function AlertsGrouped({
   alerts,

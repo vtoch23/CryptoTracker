@@ -8,6 +8,7 @@ import AlertsGrouped from "../components/AlertsGrouped";
 import SearchableDropdown from "../components/SearchableDropdown";
 
 import { apiFetch } from "../api/apiClient";
+import { formatPrice } from "../utils/priceFormatters";
 import type {
   CoinPrice,
   WatchlistItem,
@@ -122,10 +123,7 @@ export default function Dashboard() {
     }
   };
 
-  const formatPrice = (price: number) => {
-    if (price === undefined || price === null) return "-";
-    return price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  // formatPrice imported from utils/priceFormatters.ts
 
   useEffect(() => {
     fetchAllCoins();
@@ -413,6 +411,7 @@ export default function Dashboard() {
               Logout
             </button>
           </div>
+
         </div>
 
         {/* Tabs */}
@@ -436,26 +435,27 @@ export default function Dashboard() {
       </header>
 
       {/* Toasts */}
-      <div className="fixed top-20 right-4 z-50 w-80 pointer-events-none">
-        {error && (
-          <div className="mb-3 p-4 bg-red-500/20 border border-red-500/50 text-red-200 rounded-lg flex justify-between items-center pointer-events-auto">
-            <span>{error}</span>
-            <button onClick={() => setError("")} className="text-red-300">
-              <X size={20} />
-            </button>
-          </div>
-        )}
-        {success && (
-          <div className="mb-3 p-4 bg-green-500/20 border border-green-500/50 text-green-200 rounded-lg flex justify-between items-center pointer-events-auto">
-            <span>{success}</span>
-            <button onClick={() => setSuccess("")} className="text-green-300">
-              <X size={20} />
-            </button>
-          </div>
-        )}
+      <div className="max-w-7xl mx-auto px-4 flex justify-end">
+        <div className="fixed top-20 z-50 w-80 pointer-events-none">
+          {error && (
+            <div className="mb-2 p-2 bg-red-500/20 border border-red-500/50 text-red-200 rounded-lg flex justify-between items-center pointer-events-auto text-sm">
+              <span>{error}</span>
+              <button onClick={() => setError("")} className="text-red-300">
+                <X size={16} />
+              </button>
+            </div>
+          )}
+          {success && (
+            <div className="mb-2 p-2 bg-green-500/20 border border-green-500/50 text-green-200 rounded-lg flex justify-between items-center pointer-events-auto text-sm">
+              <span>{success}</span>
+              <button onClick={() => setSuccess("")} className="text-green-300">
+                <X size={16} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Content */}
       <main className="max-w-7xl w-full mx-auto px-4 py-8 pb-12 space-y-8">
 
         {/* DASHBOARD */}

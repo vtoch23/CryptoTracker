@@ -1,12 +1,6 @@
 export const API_URL = "http://localhost:8000";
 
-export const formatPrice = (price: number | undefined) => {
-  if (price === undefined || price === null) return "0.00";
-  if (price >= 1) return price.toFixed(2);
-  if (price >= 0.01) return price.toFixed(4);
-  if (price >= 0.0001) return price.toFixed(6);
-  return price.toFixed(8);
-};
+// formatPrice moved to utils/priceFormatters.ts for better organization
 
 import type { HistoryItem } from "../types";
 

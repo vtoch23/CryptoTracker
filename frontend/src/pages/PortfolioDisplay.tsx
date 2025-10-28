@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Trash2 } from "lucide-react";
+import { formatPrice } from "../utils/priceFormatters";
 
 interface CostBasis {
     id: number;
@@ -12,14 +13,6 @@ interface CoinPrice {
     symbol: string;
     price: number;
 }
-
-const formatPrice = (price: number | undefined, minDecimals = 2) => {
-    if (price === undefined || price === null || isNaN(price)) return "0.0000";
-    if (price >= 1) return price.toFixed(Math.max(minDecimals, 4));
-    if (price >= 0.01) return price.toFixed(4);
-    if (price >= 0.0001) return price.toFixed(6);
-    return price.toFixed(8);
-};
 
 export default function PortfolioDisplay({
     costBasis,
@@ -67,9 +60,15 @@ export default function PortfolioDisplay({
                     >
                         {/* Coin Header */}
                         <div className="flex justify-between items-center mb-3">
-                            <h3 className="text-yellow-300 text-lg font-semibold">
-                                {symbol}
-                            </h3>
+                            <div className="flex items-center gap-3">
+                                <h3 className="text-yellow-300 text-lg font-semibold">
+                                    {symbol}
+                                </h3>
+                                <p className="text-slate-200 text-base">Current price </p>
+                                <p className="text-slate-300 text-base">
+                                    ${formatPrice(currentPrice)}
+                                </p>
+                            </div>
                             <p
                                 className={`font-semibold ${totalCurrentValue >= totalInvested ? "text-green-400" : "text-red-400"}`}
                             >
