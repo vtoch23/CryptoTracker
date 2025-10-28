@@ -1,23 +1,32 @@
 from pydantic_settings import BaseSettings
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(override=True)
+# Load .env from project root (two levels up from this file)
+env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path, override=True)
 
 
 def running_in_docker() -> bool:
     """Detect if the app is running inside a Docker container."""
     if os.path.exists("/.dockerenv"):
         return True
-    if os.getenv("DOCKER_CONTAINER") or os.getenv("RUNNING_IN_DOCKER"):
+
+    # Check env vars (must parse string to boolean properly)
+    docker_container = os.getenv("DOCKER_CONTAINER", "").lower() in ("true", "1", "yes")
+    running_in_docker_env = os.getenv("RUNNING_IN_DOCKER", "").lower() in ("true", "1", "yes")
+
+    if docker_container or running_in_docker_env:
         return True
+
     return False
 
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg2://crypto_user:crypto_pass@localhost:5433/crypto"
     SECRET_KEY: str = os.getenv('SECRET_KEY')
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1
     COINGECKO_API_KEY: str = os.getenv('CoinGecko_API_KEY')
     COINGECKO_PRICE_URL: str = os.getenv('COINGECKO_PRICE_URL')
 
