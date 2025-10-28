@@ -156,9 +156,22 @@ function WatchlistDisplay(props: WatchlistDisplayProps) {
               </div>
             </div>
 
-            {hasChart && candles.has(wl.symbol) && (
+            {hasChart && (
               <div className="bg-slate-700/20 border border-slate-600/20 rounded-lg p-4">
-                <CandleChart candles={candles.get(wl.symbol)!} />
+                {candles.has(wl.symbol) ? (
+                  <CandleChart candles={candles.get(wl.symbol)!} />
+                ) : isLoadingChart ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="text-slate-400 flex flex-col items-center gap-3">
+                      <div className="animate-spin text-3xl">⟳</div>
+                      <p>Loading chart data...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center text-slate-400">
+                    No chart data available
+                  </div>
+                )}
               </div>
             )}
 

@@ -6,6 +6,28 @@ Application Overview
 - View market trends, gainers, and losers
 - Analyze historical price data with OHLC candle charts
 
+Dashboard section
+![alt text](image.png)
+
+Purchase history
+![alt text](image-1.png)
+
+7-day Chart
+![alt text](image-2.png)
+
+Coin 7-day history
+![alt text](image-3.png)
+
+Portfolio section
+![alt text](image-4.png)
+
+Makets section
+![alt text](image-5.png)
+
+Alerts
+![alt text](image-6.png)
+
+
 Tech Stack
 
 Frontend:

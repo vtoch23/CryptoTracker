@@ -83,6 +83,25 @@ export const apiClient = {
       throw error;
     }
   },
+
+  /**
+   * PUT request
+   */
+  async put<T = any>(url: string, body?: any, options?: RequestInit): Promise<Response> {
+    try {
+      const response = await axiosInstance.put(url, body, {
+        signal: options?.signal,
+      });
+
+      return new Response(JSON.stringify(response.data), {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers as any,
+      });
+    } catch (error: any) {
+      throw error;
+    }
+  },
 };
 
 /**
@@ -99,6 +118,9 @@ export async function apiFetch(url: string, options?: RequestInit): Promise<Resp
       case 'POST':
         const postBody = options?.body ? JSON.parse(options.body as string) : undefined;
         return await apiClient.post(url, postBody, options);
+      case 'PUT':
+        const putBody = options?.body ? JSON.parse(options.body as string) : undefined;
+        return await apiClient.put(url, putBody, options);
       case 'DELETE':
         return await apiClient.delete(url, options);
       case 'PATCH':

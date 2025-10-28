@@ -23,18 +23,10 @@ axiosInstance.interceptors.request.use(
 
 // Response interceptor to handle token expiration
 axiosInstance.interceptors.response.use(
-  (response) => {
-    // If response is successful, just return it
-    return response;
-  },
+  (response) => response,
   (error) => {
-    console.log("Axios interceptor caught error:", error);
-    console.log("Error response status:", error.response?.status);
-
     // Check if error is due to unauthorized access (401)
     if (error.response && error.response.status === 401) {
-      console.log("🔴 401 Unauthorized detected - logging out");
-
       // Clear the token from localStorage
       window.localStorage.removeItem("token");
 

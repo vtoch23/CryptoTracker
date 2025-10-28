@@ -58,7 +58,7 @@ export default function Dashboard() {
       const data = await response.json();
       setAllCoins(data);
     } catch (err) {
-      console.error("Coin list fetch failed");
+      // Silently fail - not critical for user experience
     }
   };
 
@@ -73,7 +73,7 @@ export default function Dashboard() {
       });
       setMarketPrices(priceMap);
     } catch (err) {
-      console.error("Failed to fetch market prices:", err);
+      // Silently fail - market prices are supplementary
     }
   };
 
@@ -95,7 +95,7 @@ export default function Dashboard() {
       } else {
         setPrices([]);
       }
-      console.log("prices received on fetch", prices);
+
       if (watchlistRes.status === "fulfilled" && watchlistRes.value.ok) {
         setWatchlist(await watchlistRes.value.json());
       } else {
@@ -123,8 +123,6 @@ export default function Dashboard() {
     }
   };
 
-  // formatPrice imported from utils/priceFormatters.ts
-
   useEffect(() => {
     fetchAllCoins();
     fetchAllData();
@@ -148,8 +146,8 @@ export default function Dashboard() {
       const historyData = data.history || [];
       setHistory(prev => new Map(prev).set(symbol, historyData));
     } catch (err: any) {
-      if (err.name !== "AbortError") {
-        console.error("History fetch error:", err);
+      // Ignore abort/cancel errors (user canceled or new request started)
+      if (err.name !== "AbortError" && err.name !== "CanceledError" && err.code !== "ERR_CANCELED") {
         setError("Failed to load history");
         setTimeout(() => setError(""), 4000);
       }
@@ -177,8 +175,8 @@ export default function Dashboard() {
       const candleData = data.candles || [];
       setCandles(prev => new Map(prev).set(symbol, candleData));
     } catch (err: any) {
-      if (err.name !== "AbortError") {
-        console.error("Chart fetch error:", err);
+      // Ignore abort/cancel errors (user canceled or new request started)
+      if (err.name !== "AbortError" && err.name !== "CanceledError" && err.code !== "ERR_CANCELED") {
         setError("Failed to load chart");
         setTimeout(() => setError(""), 4000);
       }
@@ -219,7 +217,8 @@ export default function Dashboard() {
       });
       setWatchlist(prev => prev.filter(i => i.id !== id));
     } catch (err) {
-      console.error(err);
+      setError("Failed to remove from watchlist");
+      setTimeout(() => setError(""), 3000);
     }
   };
 
@@ -255,7 +254,8 @@ export default function Dashboard() {
       });
       setAlerts(prev => prev.filter(a => a.id !== id));
     } catch (err) {
-      console.error(err);
+      setError("Failed to remove alert");
+      setTimeout(() => setError(""), 3000);
     }
   };
 
@@ -292,7 +292,8 @@ export default function Dashboard() {
       });
       setCostBasis(prev => prev.filter(c => c.id !== id));
     } catch (err) {
-      console.error(err);
+      setError("Failed to delete purchase");
+      setTimeout(() => setError(""), 3000);
     }
   };
 
@@ -343,8 +344,10 @@ export default function Dashboard() {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   };
-  const handleDrop = (e: React.DragEvent, targetId: number) => {
+  const handleDrop = async (e: React.DragEvent, targetId: number) => {
     e.preventDefault();
+    console.log("🔵 Drop event triggered");
+
     if (draggedItem === null || draggedItem === targetId) {
       setDraggedItem(null);
       return;
@@ -360,6 +363,43 @@ export default function Dashboard() {
     newList.splice(targetIndex, 0, draggedObj);
     setWatchlist(newList);
     setDraggedItem(null);
+
+    console.log("🔵 Calling API to save order...");
+
+    // Persist the new order to the backend
+    try {
+      const orderedIds = newList.map(item => item.id);
+      console.log("🔵 Ordered IDs:", orderedIds);
+
+      const response = await apiFetch("/watchlist/reorder", {
+        method: "PUT",
+        body: JSON.stringify({ item_ids: orderedIds })
+      });
+
+      console.log("🔵 Response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("🔴 Response error:", errorText);
+        throw new Error(`Server error ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log("🟢 Success! Result:", result);
+
+      if (result.status === "success") {
+        setSuccess("Order saved!");
+        setTimeout(() => setSuccess(""), 2000);
+      }
+    } catch (err: any) {
+      // Log error details for debugging
+      console.error("🔴 Reorder failed:", err);
+      setError(`Failed to save order: ${err.message || 'Unknown error'}`);
+      setTimeout(() => setError(""), 5000);
+      // Revert to original order on error
+      console.log("🔴 Reverting to original order...");
+      await fetchAllData();
+    }
   };
 
   const handleLogout = () => {
@@ -462,7 +502,7 @@ export default function Dashboard() {
         {activeTab === "dashboard" && (
           <div className="space-y-6">
             {/* Add to Watchlist + Add Purchase side-by-side */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-6 relative z-20">
               {/* Add to Watchlist */}
               <div className="flex-1 bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
                 <h3 className="text-white font-bold mb-4">Add to Watchlist</h3>
@@ -529,7 +569,7 @@ export default function Dashboard() {
             </div>
 
             {/* Watchlist + Markets side-by-side */}
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-3 gap-6 relative z-10">
               <div className="lg:col-span-2 bg-slate-800/40 border border-blue-500/20 rounded-xl p-6 backdrop-blur-sm shadow-xl">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-white font-bold">My Watchlist</h3>
