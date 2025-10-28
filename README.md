@@ -7,25 +7,44 @@ Application Overview
 - Analyze historical price data with OHLC candle charts
 
 Dashboard section
+
 ![alt text](image.png)
 
 Purchase history
+
 ![alt text](image-1.png)
 
 7-day Chart
+
 ![alt text](image-2.png)
 
 Coin 7-day history
+
 ![alt text](image-3.png)
 
 Portfolio section
+
 ![alt text](image-4.png)
 
 Makets section
+
+Top 100 coins
+
 ![alt text](image-5.png)
 
+Trending coins
+
+![alt text](image-7.png)
+
+Gainers and Losers
+
+![alt text](image-8.png)
+
 Alerts
+
 ![alt text](image-6.png)
+
+![alt text](image-9.png)
 
 
 Tech Stack
@@ -223,7 +242,7 @@ npx cypress run
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/vtoch23/CryptoTracker.git
 cd CryptoTracker/backend
 ```
 
