@@ -151,6 +151,9 @@ Make sure backend, Celery, RabbitMQ (port `5433`) and database are running in Do
 cd ../backend
 docker compose up -d  # or your existing command
 
+#### to restart
+docker-compose down && docker-compose up --build -d
+
 ## 2. Start the frontend
 
 cd frontend
@@ -312,6 +315,10 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # Production mode
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
+
+#### to kill uvicorn process
+lsof -i :8000 | grep LISTEN
+kill -9 pid && sleep 1 && lsof -i :8000 | grep LISTEN || echo "Port 80
 
 API will be available at:
 - **API**: http://localhost:8000

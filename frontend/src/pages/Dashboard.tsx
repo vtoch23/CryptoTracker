@@ -7,7 +7,7 @@ import MarketDisplay from "../components/MarketDisplay";
 import AlertsGrouped from "../components/AlertsGrouped";
 import SearchableDropdown from "../components/SearchableDropdown";
 
-import { API_URL } from "../utils/helpers";
+import { apiFetch } from "../api/apiClient";
 import type {
   CoinPrice,
   WatchlistItem,
@@ -53,7 +53,7 @@ export default function Dashboard() {
 
   const fetchAllCoins = async () => {
     try {
-      const response = await fetch(`${API_URL}/charts/available-coins`);
+      const response = await apiFetch("/charts/available-coins");
       const data = await response.json();
       setAllCoins(data);
     } catch (err) {
@@ -63,7 +63,7 @@ export default function Dashboard() {
 
   const fetchMarketPrices = async () => {
     try {
-      const response = await fetch(`${API_URL}/market/prices`);
+      const response = await apiFetch("/market/prices");
       const data = await response.json();
       const priceMap = new Map<string, number>();
       // Expecting { [coinId]: { usd: number } }
@@ -81,13 +81,12 @@ export default function Dashboard() {
     try {
       setLoading(true);
       setError("");
-      const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
       const [pricesRes, watchlistRes, alertsRes, costRes] = await Promise.allSettled([
-        fetch(`${API_URL}/prices/`, { headers }),
-        fetch(`${API_URL}/watchlist/`, { headers }),
-        fetch(`${API_URL}/alerts/`, { headers }),
-        fetch(`${API_URL}/cost-basis/`, { headers }),
+        apiFetch("/prices/"),
+        apiFetch("/watchlist/"),
+        apiFetch("/alerts/"),
+        apiFetch("/cost-basis/"),
       ]);
 
       if (pricesRes.status === "fulfilled" && pricesRes.value.ok) {
@@ -145,7 +144,7 @@ export default function Dashboard() {
     const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
-      const res = await fetch(`${API_URL}/charts/history/${coinId}?days=7`, { signal: controller.signal });
+      const res = await apiFetch(`/charts/history/${coinId}?days=7`, { signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const historyData = data.history || [];
@@ -174,7 +173,7 @@ export default function Dashboard() {
     const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
-      const res = await fetch(`${API_URL}/charts/chart/${coinId}?days=7&interval=4h`, { signal: controller.signal });
+      const res = await apiFetch(`/charts/chart/${coinId}?days=7&interval=4h`, { signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const candleData = data.candles || [];
@@ -199,9 +198,8 @@ export default function Dashboard() {
       return;
     }
     try {
-      const res = await fetch(`${API_URL}/watchlist/`, {
+      const res = await apiFetch("/watchlist/", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ coin_id: coinId })
       });
       if (!res.ok) throw new Error("Failed to add");
@@ -218,9 +216,8 @@ export default function Dashboard() {
 
   const handleRemoveFromWatchlist = async (id: number) => {
     try {
-      await fetch(`${API_URL}/watchlist/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
+      await apiFetch(`/watchlist/${id}`, {
+        method: "DELETE"
       });
       setWatchlist(prev => prev.filter(i => i.id !== id));
     } catch (err) {
@@ -236,9 +233,8 @@ export default function Dashboard() {
       return;
     }
     try {
-      const res = await fetch(`${API_URL}/alerts/`, {
+      const res = await apiFetch("/alerts/", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ symbol: selectedCoin, target_price: alertPrice })
       });
       if (!res.ok) throw new Error("Failed to create alert");
@@ -256,9 +252,8 @@ export default function Dashboard() {
 
   const handleRemoveAlert = async (id: number) => {
     try {
-      await fetch(`${API_URL}/alerts/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
+      await apiFetch(`/alerts/${id}`, {
+        method: "DELETE"
       });
       setAlerts(prev => prev.filter(a => a.id !== id));
     } catch (err) {
@@ -274,9 +269,8 @@ export default function Dashboard() {
       return;
     }
     try {
-      const res = await fetch(`${API_URL}/cost-basis/`, {
+      const res = await apiFetch("/cost-basis/", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ symbol: newCostSymbol, cost_price: newCostPrice, quantity: newCostQuantity })
       });
       if (!res.ok) throw new Error("Failed to add purchase");
@@ -295,9 +289,8 @@ export default function Dashboard() {
 
   const handleDeleteCostBasis = async (id: number) => {
     try {
-      await fetch(`${API_URL}/cost-basis/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
+      await apiFetch(`/cost-basis/${id}`, {
+        method: "DELETE"
       });
       setCostBasis(prev => prev.filter(c => c.id !== id));
     } catch (err) {
