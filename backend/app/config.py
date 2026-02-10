@@ -9,7 +9,6 @@ load_dotenv(dotenv_path=env_path, override=True)
 
 
 def running_in_docker() -> bool:
-    """Detect if the app is running inside a Docker container."""
     if os.path.exists("/.dockerenv"):
         return True
 
@@ -24,23 +23,23 @@ def running_in_docker() -> bool:
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql+psycopg2://crypto_user:crypto_pass@localhost:5433/crypto"
+    DATABASE_URL: str = os.getenv('DATABASE_URL')
     SECRET_KEY: str = os.getenv('SECRET_KEY')
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1
     COINGECKO_API_KEY: str = os.getenv('CoinGecko_API_KEY')
     COINGECKO_PRICE_URL: str = os.getenv('COINGECKO_PRICE_URL')
 
-    CELERY_BROKER_URL: str = "amqp://guest:guest@localhost:5672//"
+    CELERY_BROKER_URL: str = os.getenv('CELERY_BROKER_URL')
     CELERY_RESULT_BACKEND: str = "rpc://"
-    REDIS_URL: str = "redis://localhost:6379/0"
-    RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672/"
+    REDIS_URL: str = os.getenv('REDIS_URL')
+    RABBITMQ_URL: str = os.getenv('RABBITMQ_URL')
 
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
-    SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
-    SMTP_FROM_EMAIL: str = "noreply@cryptotracker.com"
-    SMTP_TLS: bool = True
+    SMTP_HOST: str = os.getenv('SMTP_HOST')
+    SMTP_PORT: int = int(os.getenv('SMTP_PORT', 587))
+    SMTP_USER: str = os.getenv('SMTP_USER', '')
+    SMTP_PASSWORD: str = os.getenv('SMTP_PASSWORD', '')
+    SMTP_FROM_EMAIL: str = os.getenv('SMTP_FROM_EMAIL')
+    SMTP_TLS: bool = os.getenv('SMTP_TLS', 'true').lower() == 'true'
     
     class Config:
         env_file = ".env"
@@ -51,14 +50,14 @@ class Settings(BaseSettings):
 settings = Settings()
 
 if running_in_docker():
-    print("⚙️ Running inside Docker — using container networking")
-    settings.DATABASE_URL = "postgresql+psycopg2://postgres:password@db:5432/cryptotracker"
-    settings.REDIS_URL = "redis://redis:6379/0"
-    settings.RABBITMQ_URL = "amqp://guest:guest@rabbitmq:5672//"
+    print("Running inside Docker — using container networking")
+    settings.DATABASE_URL = os.getenv('DATABASE_URL_DOCKER')
+    settings.REDIS_URL = os.getenv('REDIS_URL_DOCKER')
+    settings.RABBITMQ_URL = os.getenv('RABBITMQ_URL_DOCKER')
     settings.CELERY_BROKER_URL = settings.RABBITMQ_URL
 else:
-    print("🧑‍💻 Running locally — using localhost networking")
-    settings.DATABASE_URL = "postgresql+psycopg2://crypto_user:crypto_pass@localhost:5433/crypto"
-    settings.REDIS_URL = settings.REDIS_URL or "redis://localhost:6379/0"
-    settings.RABBITMQ_URL = settings.RABBITMQ_URL or "amqp://guest:guest@localhost:5672//"
+    print("Running locally — using localhost networking")
+    settings.DATABASE_URL = settings.DATABASE_URL or os.getenv('DATABASE_URL')
+    settings.REDIS_URL = settings.REDIS_URL or os.getenv('REDIS_URL')
+    settings.RABBITMQ_URL = settings.RABBITMQ_URL or os.getenv('RABBITMQ_URL')
     settings.CELERY_BROKER_URL = settings.CELERY_BROKER_URL or settings.RABBITMQ_URL
