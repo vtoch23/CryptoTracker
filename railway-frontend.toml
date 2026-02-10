@@ -3,4 +3,4 @@ builder = "dockerfile"
 dockerfilePath = "frontend/Dockerfile"
 
 [deploy]
-startCommand = "serve -s dist -l tcp://0.0.0.0:$PORT"
+startCommand = "serve -s dist -l tcp://0.0.0.0:8000"

@@ -13,4 +13,4 @@ RUN npm install -g serve
 
 EXPOSE 3000
 
-CMD serve -s dist -l tcp://0.0.0.0:$PORT
+CMD serve -s dist -l tcp://0.0.0.0:8000
