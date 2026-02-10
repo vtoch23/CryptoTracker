@@ -5,6 +5,7 @@ Idempotent - safe to run multiple times.
 """
 
 import logging
+import os
 from datetime import datetime
 from pycoingecko import CoinGeckoAPI
 from app.database import SessionLocal, engine
@@ -326,8 +327,6 @@ def init_coin_history_table():
     Create coin_history table if it doesn't exist.
     This is idempotent - safe to run multiple times.
     """
-    
-    
     try:
         logger.info("Creating coin_history table if not exists...")
         
@@ -346,12 +345,25 @@ def initialize_database():
     """
     Run all initialization tasks.
     Call this from FastAPI startup event.
+    
+    DISABLED in Railway production to avoid startup delays and API rate limits.
+    Run manually via CLI or admin endpoint if needed.
     """
+    # Check if we're in Railway production
+    is_railway = os.getenv("RAILWAY_ENVIRONMENT") is not None
+    
+    if is_railway:
+        logger.info("Railway environment detected - skipping automatic database initialization")
+        logger.info("Database tables will be created automatically on first use")
+        logger.info("Run manual initialization via CLI if you need to populate reference data")
+        return True
+    
     logger.info("DATABASE INITIALIZATION STARTED")
     
     try:
         # Initialize tables in order
-        # init_coin_history_table()  # Create history table first
+        init_coin_history_table()  # Create history table first
+        # Commented out to avoid CoinGecko API calls on every startup
         # init_coins_table()
         # init_top100_table()
         # init_trending_coins()
