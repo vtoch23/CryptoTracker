@@ -9,6 +9,7 @@ __pycache__/
 # Archive
 *Archive*
 
+.DS_Store*
 
 # Distribution / packaging
 .Python
