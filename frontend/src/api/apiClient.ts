@@ -11,7 +11,7 @@ export const apiClient = {
   async get<T = any>(url: string, options?: RequestInit): Promise<Response> {
     try {
       const response = await axiosInstance.get(url, {
-        signal: options?.signal,
+        signal: (options?.signal ?? undefined) as any,
       });
 
       // Create a fetch-like Response object
@@ -33,7 +33,7 @@ export const apiClient = {
   async post<T = any>(url: string, body?: any, options?: RequestInit): Promise<Response> {
     try {
       const response = await axiosInstance.post(url, body, {
-        signal: options?.signal,
+        signal: (options?.signal ?? undefined) as any,
       });
 
       return new Response(JSON.stringify(response.data), {
@@ -52,7 +52,7 @@ export const apiClient = {
   async delete<T = any>(url: string, options?: RequestInit): Promise<Response> {
     try {
       const response = await axiosInstance.delete(url, {
-        signal: options?.signal,
+        signal: (options?.signal ?? undefined) as any,
       });
 
       return new Response(JSON.stringify(response.data), {
@@ -71,7 +71,7 @@ export const apiClient = {
   async patch<T = any>(url: string, body?: any, options?: RequestInit): Promise<Response> {
     try {
       const response = await axiosInstance.patch(url, body, {
-        signal: options?.signal,
+        signal: (options?.signal ?? undefined) as any,
       });
 
       return new Response(JSON.stringify(response.data), {
@@ -90,7 +90,7 @@ export const apiClient = {
   async put<T = any>(url: string, body?: any, options?: RequestInit): Promise<Response> {
     try {
       const response = await axiosInstance.put(url, body, {
-        signal: options?.signal,
+        signal: (options?.signal ?? undefined) as any,
       });
 
       return new Response(JSON.stringify(response.data), {
